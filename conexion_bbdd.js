@@ -20,7 +20,7 @@ var con = mysql.createConnection({
 con.connect(function (err) {
     if (err) {
         console.error("Error en la conexión a la Base de datos")
-        throw err;}
+        /*throw err;*/}
     console.log("Conectado a la base de datos");
 
 });
@@ -72,8 +72,28 @@ function buscausuario(usuario) {
 
 }
 
+/**
+ * Busca las presentaciones disponibles en el servidor a partir del usuario
+ * @param {*} usuario 
+ */
+function buscaPresentaciones(usuario){
+    return new Promise(function (resolve, reject) {
+        var sql = `SELECT * FROM presentaciones WHERE nombreusuario='${usuario}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else if (result == ''){
+                reject('No se encuentra el usuario!');
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
 //con.end((error)=>{console.log(error);}); //finaliza la conexión
 //Declaración de las funciones
 module.exports = {
-    buscausuario: buscausuario
+    buscausuario: buscausuario,
+    buscaPresentaciones: buscaPresentaciones
 };
