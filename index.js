@@ -10,6 +10,9 @@ var app = express();
 var bodyParser = require('body-parser'); //Recibe los datos enviados en los formularios
 var mysql = require('./conexion_bbdd'); //Conexión a la base de datos
 var qrcode = require('qrcode');
+const http = require('http').createServer(app); //npm i http
+const io = require('socket.io')(http); //npm i socket.io
+
 
 //REST
 const puerto = 8080;
@@ -37,7 +40,8 @@ app.set('view engine', 'ejs');
 
 //Obtener los recursos necesarios para la página web
 //app.use('/public/css', express.static(__dirname + '/css'));
-//app.use('/public/js', express.static(__dirname + '/js'));
+app.use('/public', express.static(path.join(__dirname,'public')));
+app.use('/private', express.static(path.join(__dirname,'private')));
 //app.use('/public/img', express.static(__dirname + '/img'));
 
 //Opciones para el QR
@@ -72,7 +76,7 @@ app.post(urlLogin, function (request, response) {
 					apellidos: usuario.apellidos
 				};
 				//Responde con código 200 y el objeto usuario
-				response.status(200).send('OK:' + Object.values(user));
+				response.status(200).send('OK:' + Object.values(user)); //Object values devuelve los valores separados por ,
 			} else {
 				response.send('ERROR 2: Usuario o contraseña incorrectos!');
 			}
@@ -90,18 +94,20 @@ app.post(urlLogin, function (request, response) {
 	desde la aplicación */
 app.get(urlUsuario, function (request, response) {
 	var usuario = request.params.usuario;
-
+	var hora = new Date().getHours()+':'+new Date().getMinutes();
+	console.log(hora+" Petición de presentaciones: "+usuario);
 	mysql.buscaPresentaciones(usuario).then((listaPresentaciones) => {
+		//response.status(200).send(listaPresentaciones);
 		response.status(200).send(listaPresentaciones);
 	}).catch((error) => {
-		response.send(error);
+		response.status(404).send(error);
 	}).finally(() => { response.end(); });
 });
 
 /*Petición para crear sesión
 Atributos necesarios: nombresesion; presentacion;
 */
-//TODO realizar comprobacion de usuario y/o sesión
+//TODO realizar comprobacion de usuario y/o sesión++++++++++++++++++++++++++++++++++++++++++++++++++++
 app.post(urlcreaSesion, function (request, response) {
 	var usuario = request.params.usuario;
 	var sesion = request.body.session;
@@ -148,22 +154,42 @@ app.get(urlpresentacion, function (request, response) {
 	var nombresesion = request.params.nombresesion;
 	var index = buscaSesion(usuario, nombresesion);
 	if (index != -1) {
-		var jsonSesion = JSON.stringify(sesiones[index]);
-
+		var sesion = sesiones[index];
+		var jsonSesion = JSON.stringify(sesion);
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
 			//console.log(url);
-			response.render(path.join(__dirname, 'public', 'sesion.ejs'), { 'nombre': usuario, 'qr': url });
+			creaSocket(sesion.nombreusuario);
+			response.render(path.join(__dirname, 'public', 'sesion.ejs'), { 'sesion': sesion, 'qr': url });
+			
 		});
 	} else {
 		response.status(404).send('Los datos no son correctos');
 	}
 });
 
-app.listen(puerto, () => {
+http.listen(puerto, () => {
 	console.log(`Servidor Presentación virtual:
 http://localhost:${puerto}/virtualpresentation`)
 });
 
+/**Funcion socket */
+function creaSocket(nombresesion){
+	io.on('connection', (socket) => { //TODO probar a sacar io.on fuera
+		console.log('Usuario conectado, id:', socket.id);
+		//io.emit('Hi!');
+		socket.on(nombresesion, (msg) => {
+		  console.log('Mensaje:', msg);
+		  //io.to(msg.usuario).emit('cambia pagina',msg);
+		  io.emit(nombresesion, msg);
+		});
+		socket.on('disconnect', () => {
+		  console.log('Usuario desconectado, id:', socket.id);
+		  io.emit(nombresesion, "desconectado");
+		});
+	  });
+}
+
+/* Sesión */
 function Sesion(usuario, sesion, presentacion) {
 	this.nombreusuario = usuario;
 	this.nombresesion = sesion;

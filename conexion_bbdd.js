@@ -4,9 +4,11 @@ const mysql = require('mysql');
  * +--------+---------------+-----------+---------+------------+
  * |  id    | nombreusuario | password  | nombre  | apellidos  |
  * +--------+---------------+-----------+---------+------------+
- * |   1    |    admin      |   admin   |Administrador| usuario|
- * |   2    |    sergio     |   123456  | Sergio  |  Caballero |
- * +--------+---------------+-----------+---------+------------+
+ * 
+ * Estructura tabla presentaciones:
+ * +----------------+--------------+----------+----------------+
+ * | idpresentacion | presentacion | paginas  | nombreusuario  |
+ * +----------------+--------------+----------+----------------+
  */
 // Conexión a la base de datos
 //parámetros de la conexión
