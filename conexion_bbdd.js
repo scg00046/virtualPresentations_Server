@@ -22,7 +22,7 @@ var con = mysql.createConnection({
 con.connect(function (err) {
     if (err) {
         console.error("Error en la conexión a la Base de datos")
-        /*throw err;*/
+        throw err;
     }else { console.log("Conectado a la base de datos"); }
 
 });

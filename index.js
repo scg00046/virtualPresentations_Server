@@ -148,7 +148,7 @@ app.delete(urlcreaSesion, function (request, response) {
 
 /* Mostrará un código qr (con el nombre de la sesión y usuario)
 	y redirecciona cuando reciba OK de la aplicación */
-//TODO añadir comprobaciones antes de mostrar qr
+//TODO añadir comprobaciones antes de mostrar qr coincide usuario 
 app.get(urlpresentacion, function (request, response) {
 	var usuario = request.params.usuario;
 	var nombresesion = request.params.nombresesion;
@@ -158,8 +158,9 @@ app.get(urlpresentacion, function (request, response) {
 		var jsonSesion = JSON.stringify(sesion);
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
 			//console.log(url);
-			creaSocket(sesion.nombreusuario);
-			response.render(path.join(__dirname, 'public', 'sesion.ejs'), { 'sesion': sesion, 'qr': url });
+			creaSocket(sesion.nombresesion); //TODO pasar id socket al qr
+			//nuevoSocket(sesion.nombresesion);
+			response.render(path.join(__dirname, 'public', 'presentation.ejs'), { 'sesion': sesion, 'qr': url });
 			
 		});
 	} else {
@@ -174,14 +175,17 @@ http://localhost:${puerto}/virtualpresentation`)
 
 /**Funcion socket */
 function creaSocket(nombresesion){
-	io.on('connection', (socket) => { //TODO probar a sacar io.on fuera
-		console.log('Usuario conectado, id:', socket.id);
+
+	io.on('connection', (socket) => { 
+		console.log('Socket:'+nombresesion+'; Usuario conectado, id:', socket.id);
 		//io.emit('Hi!');
+		//Recepción de mensajes
 		socket.on(nombresesion, (msg) => {
 		  console.log('Mensaje:', msg);
 		  //io.to(msg.usuario).emit('cambia pagina',msg);
 		  io.emit(nombresesion, msg);
 		});
+		//Desconexión de usuario
 		socket.on('disconnect', () => {
 		  console.log('Usuario desconectado, id:', socket.id);
 		  io.emit(nombresesion, "desconectado");

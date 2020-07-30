@@ -9,7 +9,7 @@ var divpdf = document.getElementById("div_pdfviwer");
 var usuario = document.getElementById("usuario").innerHTML;
 var sesion = document.getElementById("nombreSocketRoom").innerHTML;
 var presentacion = document.getElementById("presentacion").innerHTML;
-var rutapdf = '/private/'+usuario+'/'+presentacion;
+var rutapdf = '/private/' + usuario + '/' + presentacion;
 //Estado inicial del visor
 var ctx = canvas.getContext('2d');
 var myState = {
@@ -19,7 +19,7 @@ var myState = {
 }
 
 
-console.log("Conectado LEERPDF.JS; Socket: "+sesion+'\r\n'+rutapdf);
+console.log("Conectado LEERPDF.JS; Sesion: " + sesion + '\r\n' + rutapdf);
 divpdf.style.display = "none"; //oculto
 divqr.style.display = "block"; //visible
 
@@ -119,32 +119,73 @@ window.onwheel = function (e) {
  * Pruebas para leer por consola el número de página a la que ir
  */
 
-function cambiapagina(pg) {
+function cambiapagina(/*pg*/) {
     console.log("function cambiapagina");
     if (myState.pdf == null || myState.currentPage > myState.pdf._pdfInfo.numPages) {
         return;
     } else {
-        myState.currentPage = pg;
+        //myState.currentPage = pg;
         document.getElementById("current_page").value = myState.currentPage;
         render();
     }
 
 
 }
-var p = 0;
+//var p = 0;
 //socket.on('cambia pagina', function (msg) {
 socket.on(sesion, function (msg) {
     var user = msg.usuario;
-    var pagina = parseInt(msg.mensaje);
-    
+    //var pagina = parseInt(msg.mensaje);
 
-    console.log('socket id :'+socket.id+' mensaje: '+msg+' usuario:'+user);//muestra el id del socket
+
+    console.log('socket id :' + socket.id + ' mensaje: ' + msg + ' usuario recibido:' + user);//muestra el id del socket
+
+    if (user == usuario) {
+        switch (msg.mensaje) {
+            case "OK":
+                divpdf.style.display = "block"; // block: mostrar
+                divqr.style.display = "none"; //none: ocultar;
+                break;
+            case "pmas":
+                myState.currentPage++;
+                cambiapagina();
+                break;
+            case "pmenos":
+                myState.currentPage--;
+                cambiapagina();
+                break;
+
+            case "zmas":
+                myState.zoom += 0.5;
+                render();
+                break;
+            case "zmenos":
+                myState.zoom -= 0.5;
+                render();
+                break;
+
+            default:
+                //TODO emitir error ¿?
+                break;
+        }
+    }
+
+    if (msg.mensaje == "OK") {
+        divpdf.style.display = "block"; // block: mostrar
+        divqr.style.display = "none"; //none: ocultar;
+    } else if (msg.mensaje == "mas") {
+        myState.currentPage++;
+        cambiapagina();
+    } else if (msg.mensaje == "menos") {
+        myState.currentPage--;
+        cambiapagina();
+    }
     //if (msg.usuario == socket.id){
-        if (user =="adminOK"){
+    /*    if (user =="adminOK"){
             divpdf.style.display = "block"; // block: mostrar
             divqr.style.display = "none"; //none: ocultar;
-        }
-    if (user == 'admin'){
+        }*/
+    /*if (user == 'admin'){
         
         if (isNaN(pagina)) {
             console.error('Parámetro no válido');
@@ -159,11 +200,11 @@ socket.on(sesion, function (msg) {
     } else {
         console.error("Los datos recibidos no son correctos");
     }
-
-    if(msg=="desconectado"){
+*/
+    if (msg == "desconectado") {
         console.log("SE HA DESCONECTADO UN USUARIO");
         divpdf.style.display = "none"; //oculto
         divqr.style.display = "block"; //visible
     }
-    
+
 });
