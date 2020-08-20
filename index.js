@@ -4,12 +4,14 @@
  * @author Sergio Caballero Garrido
  */
 //Librerías necesarias
-var express = require('express');
-var path = require('path');
-var app = express();
-var bodyParser = require('body-parser'); //Recibe los datos enviados en los formularios
-var mysql = require('./conexion_bbdd'); //Conexión a la base de datos
-var qrcode = require('qrcode');
+const express = require('express');
+const path = require('path');
+const app = express();
+const bodyParser = require('body-parser'); //Recibe los datos enviados en los formularios
+const fileUpload = require('express-fileupload'); //Para subir ficheros
+const fs = require('fs');
+const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
+const qrcode = require('qrcode');
 const http = require('http').createServer(app); //npm i http
 const io = require('socket.io')(http); //npm i socket.io
 
@@ -20,7 +22,9 @@ const rutadef = '/virtualpresentation';
 /** Formulario (get) y envío de credenciales (post)
  * /virtualpresentation/usuario */
 const urlLogin = rutadef + '/usuario';
-/** (get) devuelve presentaciones guardadas
+/** (get) devuelve presentaciones almacenadas
+ *  (post) almacena una nueva presentación
+ *  (delete) elimina una presentación
  * /virtualpresentation/:usuario */
 const urlUsuario = rutadef + '/:usuario';
 /** Crear y borrar (delete) sesión
@@ -34,18 +38,19 @@ const urlpresentacion = urlUsuario + '/:nombresesion';
 let sesiones = [];
 
 //
+app.use(fileUpload());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.set('view engine', 'ejs');
 
 //Obtener los recursos necesarios para la página web
 //app.use('/public/css', express.static(__dirname + '/css'));
-app.use('/public', express.static(path.join(__dirname,'public')));
-app.use('/private', express.static(path.join(__dirname,'private')));
+app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use('/private', express.static(path.join(__dirname, 'private')));
 //app.use('/public/img', express.static(__dirname + '/img'));
 
 //Opciones para el QR
-var qrOp = {
+const qrOp = {
 	errorCorrectionLevel: 'H',
 	type: 'image/jpeg',
 	quality: 0.3,
@@ -70,7 +75,7 @@ app.post(urlLogin, function (request, response) {
 			console.log('El usuario buscado es: ' + usuario.nombreusuario);
 
 			if (username == usuario.nombreusuario && password == usuario.password) {
-				var user = {
+				var user = { //TODO cambiar a JSON 
 					nombreusuario: usuario.nombreusuario,
 					nombre: usuario.nombre,
 					apellidos: usuario.apellidos
@@ -94,8 +99,8 @@ app.post(urlLogin, function (request, response) {
 	desde la aplicación */
 app.get(urlUsuario, function (request, response) {
 	var usuario = request.params.usuario;
-	var hora = new Date().getHours()+':'+new Date().getMinutes();
-	console.log(hora+" Petición de presentaciones: "+usuario);
+	var hora = new Date().getHours() + ':' + new Date().getMinutes();
+	console.log(hora + " Petición de presentaciones: " + usuario);
 	mysql.buscaPresentaciones(usuario).then((listaPresentaciones) => {
 		//response.status(200).send(listaPresentaciones);
 		response.status(200).send(listaPresentaciones);
@@ -103,38 +108,99 @@ app.get(urlUsuario, function (request, response) {
 		response.status(404).send(error);
 	}).finally(() => { response.end(); });
 });
+/* Subida de presentación al servidor */
+app.post(urlUsuario, function(request,response){
+	var usuario = request.params.usuario;
+	var presentacion = request.files.presentacion;
+
+	if (usuario && presentacion){
+		if (!request.files || Object.keys(request.files).length === 0 ) {
+			return res.status(400).send('No se ha subido ningún archivo');
+		}else {
+			var directorioUsuario = path.join(__dirname, 'private', usuario);
+			var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion.name);
+			
+			//Comprobación directorio del usuario
+			fs.mkdir(directorioUsuario, (e)=>{
+				if (e.code=="EEXIST"){ return;
+				} else if (e){	//TODO enviar error al cliente?
+					return console.log('Error: '+e.code);
+				}
+				console.log('Directorio creado');
+			});
+			//Añadir presentación al directorio y a la base de datos
+			presentacion.mv(directorioPresentacion, function(err) {
+				if (err){
+					console.error('Error al guardar la presentación: '+err.code);
+					return res.status(500).send(err);
+				}
+				//TODO páginas del pdf
+				mysql.creaPresentacion(presentacion.name, paginas, usuario).then((respuesta)=>{
+					if(respuesta=='OK'){
+						res.send('Presentación subida');
+					}
+				})
+				
+			  });
+		}
+	}else {
+		//406: no aceptable //TODO revisar códigos de respuesta
+		response.status(406).send('No se han recibido datos');
+	}
+});
+/* Eliminar presentación almacenada */
+app.delete(urlUsuario, function(request, response){
+	//TODO añadir comprobaciones 
+	var usuario = request.params.usuario;
+	var presentacion = request.body.presentacion;
+	var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
+
+	try {
+		fs.unlinkSync(directorioPresentacion);
+		console.log('Archivo borrado');
+		mysql.borraPresentacion(presentacion).then((respuesta)=>{
+			if (respuesta=='OK'){
+				res.status(200).send('Eliminado correctamente');
+			} else {
+				response.status(500).send('Error en la base de datos: '+respuesta);
+			}
+		});
+	  } catch(err) {
+		console.error(err);
+		res.status(500).send('No se ha podido eliminar');
+	  }
+});
 
 /*Petición para crear sesión
 Atributos necesarios: nombresesion; presentacion;
 */
-//TODO realizar comprobacion de usuario y/o sesión++++++++++++++++++++++++++++++++++++++++++++++++++++
 app.post(urlcreaSesion, function (request, response) {
-	var usuario = request.params.usuario;
+	var usuario = request.params.usuario; //de la propia url
 	var sesion = request.body.session;
 	var presentacion = request.body.presentation;
 	//console.log('usuario: ' + usuario + ', sesion: ' + sesion + ', presentacion: ' + presentacion);
-	if (sesion && presentacion) {
-		var sesion = new Sesion(usuario, sesion, presentacion);
-		sesiones.push(sesion);
-		/*sesiones.push({
-			nombreusuario: usuario,
-			nombresesion: sesion,
-			presentacion: presentacion
-		});*/
-		console.log(sesiones);
-		//response.status(200).send(sesiones); //Prueba
-		response.status(200).send('Sesión creada');
+	//if (sesion && presentacion) {
+	if (usuario && sesion && presentacion) {
+		if (buscaSesion(usuario, sesion) != -1) {
+			response.status(400).send('La sesión ya existe');
+		} else {
+			var sesion = new Sesion(usuario, sesion, presentacion);
+			sesiones.push(sesion);
+			console.log(sesiones);
+			//response.status(200).send(sesiones); //Prueba
+			response.status(200).send('Sesión creada');
+		}
 	} else {
-		//406: no aceptable TODO revisar códigos de respuesta
+		//406: no aceptable //TODO revisar códigos de respuesta
 		response.status(406).send('No se han recibido datos');
 	}
 });
 //Finaliza la sesión
+//TODO comprobar usuario y contraseña
 app.delete(urlcreaSesion, function (request, response) {
 	var usuario = request.params.usuario;
 	var sesion = request.body.session;
 	//var presentacion = request.body.presentation;
-	//TODO eliminar la sesión de la lista
 	var pos = buscaSesion(usuario, sesion);
 	if (pos != -1) {
 		sesiones.splice(pos, 1);
@@ -149,22 +215,21 @@ app.delete(urlcreaSesion, function (request, response) {
 /* Mostrará un código qr (con el nombre de la sesión y usuario)
 	y redirecciona cuando reciba OK de la aplicación */
 //TODO añadir comprobaciones antes de mostrar qr coincide usuario 
+var nombresesion = "";
 app.get(urlpresentacion, function (request, response) {
 	var usuario = request.params.usuario;
-	var nombresesion = request.params.nombresesion;
+	nombresesion = request.params.nombresesion;
 	var index = buscaSesion(usuario, nombresesion);
+
 	if (index != -1) {
 		var sesion = sesiones[index];
 		var jsonSesion = JSON.stringify(sesion);
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
 			//console.log(url);
-			creaSocket(sesion.nombresesion); //TODO pasar id socket al qr
-			//nuevoSocket(sesion.nombresesion);
 			response.render(path.join(__dirname, 'public', 'presentation.ejs'), { 'sesion': sesion, 'qr': url });
-			
 		});
 	} else {
-		response.status(404).send('Los datos no son correctos');
+		response.status(404).send('La sesión no existe');
 	}
 });
 
@@ -173,25 +238,23 @@ http.listen(puerto, () => {
 http://localhost:${puerto}/virtualpresentation`)
 });
 
-/**Funcion socket */
-function creaSocket(nombresesion){
+// Conexión de clientes socket
+io.on('connection', (socket) => {
+	console.log('Room socket: ' + nombresesion + '; Usuario conectado, id:', socket.id);
+	//io.emit('Hi!');
+	//Recepción de mensajes
+	socket.on(nombresesion, (msg) => {
+		console.log('Mensaje:', msg);
+		//io.to(msg.usuario).emit('cambia pagina',msg);
+		io.emit(nombresesion, msg);
+	});
+	//Desconexión de usuario
+	socket.on('disconnect', () => {
+	  console.log('Usuario desconectado, id:', socket.id);
+	  //io.emit(nombresesion, "desconectado");
+	});
+});
 
-	io.on('connection', (socket) => { 
-		console.log('Socket:'+nombresesion+'; Usuario conectado, id:', socket.id);
-		//io.emit('Hi!');
-		//Recepción de mensajes
-		socket.on(nombresesion, (msg) => {
-		  console.log('Mensaje:', msg);
-		  //io.to(msg.usuario).emit('cambia pagina',msg);
-		  io.emit(nombresesion, msg);
-		});
-		//Desconexión de usuario
-		socket.on('disconnect', () => {
-		  console.log('Usuario desconectado, id:', socket.id);
-		  io.emit(nombresesion, "desconectado");
-		});
-	  });
-}
 
 /* Sesión */
 function Sesion(usuario, sesion, presentacion) {
@@ -200,12 +263,18 @@ function Sesion(usuario, sesion, presentacion) {
 	this.presentacion = presentacion;
 }
 
+/**
+ * Busca las sesiones creadas para el usuario y nombre de sesión específicos
+ * Devuelve el índice de la sesión, si la sesión no existe devuelve -1
+ * @param {String} usuario 
+ * @param {String} sesion 
+ */
 function buscaSesion(usuario, sesion) {
 	var index = -1;
 	sesiones.forEach(function (s, i) {
 		console.log(i + ' - ' + s.nombresesion);
 		if (s.nombreusuario == usuario && s.nombresesion == sesion) {
-			console.log('Coincide usuario y sesion');
+			//console.log('Coincide usuario y sesion');
 			index = i;
 		}
 	});

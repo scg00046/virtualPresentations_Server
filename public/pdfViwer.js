@@ -132,15 +132,16 @@ function cambiapagina(/*pg*/) {
 
 }
 //var p = 0;
-//socket.on('cambia pagina', function (msg) {
+var ultima=0;
 socket.on(sesion, function (msg) {
+    var nueva = Date.now();
     var user = msg.usuario;
     //var pagina = parseInt(msg.mensaje);
-
-
-    console.log('socket id :' + socket.id + ' mensaje: ' + msg + ' usuario recibido:' + user);//muestra el id del socket
-
-    if (user == usuario) {
+    var diferencia = nueva-ultima; //Para comprobar que no se realizan varias peticiones seguidas
+    console.log('('+nueva+', '+diferencia+')socket id :' + socket.id 
+        + ' mensaje: ' + msg + ' usuario recibido:' + user);//muestra el id del socket
+    
+    if (user == usuario && diferencia >= 1000) {
         switch (msg.mensaje) {
             case "OK":
                 divpdf.style.display = "block"; // block: mostrar
@@ -163,23 +164,19 @@ socket.on(sesion, function (msg) {
                 myState.zoom -= 0.5;
                 render();
                 break;
+            case "FIN":
+                console.log("SE HA DESCONECTADO UN USUARIO");
+                divpdf.style.display = "none"; //oculto
+                divqr.style.display = "block"; //visible
+                break;
 
             default:
                 //TODO emitir error ¿?
                 break;
         }
+        ultima = nueva;
     }
 
-    if (msg.mensaje == "OK") {
-        divpdf.style.display = "block"; // block: mostrar
-        divqr.style.display = "none"; //none: ocultar;
-    } else if (msg.mensaje == "mas") {
-        myState.currentPage++;
-        cambiapagina();
-    } else if (msg.mensaje == "menos") {
-        myState.currentPage--;
-        cambiapagina();
-    }
     //if (msg.usuario == socket.id){
     /*    if (user =="adminOK"){
             divpdf.style.display = "block"; // block: mostrar
@@ -201,10 +198,5 @@ socket.on(sesion, function (msg) {
         console.error("Los datos recibidos no son correctos");
     }
 */
-    if (msg == "desconectado") {
-        console.log("SE HA DESCONECTADO UN USUARIO");
-        divpdf.style.display = "none"; //oculto
-        divqr.style.display = "block"; //visible
-    }
-
+    
 });

@@ -48,7 +48,7 @@ function adduser(usuario, password, nombre, apellidos) {
 
 /**
  * Busca un usuario a partir de su nombre de usuario
- * @param {*} usuario 
+ * @param {String} usuario 
  */
 function buscausuario(usuario) {
 
@@ -76,7 +76,7 @@ function buscausuario(usuario) {
 
 /**
  * Busca las presentaciones disponibles en el servidor a partir del usuario
- * @param {*} usuario 
+ * @param {String} usuario 
  */
 function buscaPresentaciones(usuario){
     return new Promise(function (resolve, reject) {
@@ -93,9 +93,49 @@ function buscaPresentaciones(usuario){
     });
 }
 
+/**
+ * Registra en la base de datos la presentación subida al servidor
+ * @param {String} presentacion nombre completo de la presentación
+ * @param {*} paginas número de páginas
+ * @param {String} usuario nombre de usuario
+ */
+function creaPresentacion (presentacion, paginas, usuario){ //TODO realizar comprobación de usuario
+    return new Promise(function (resolve, reject) {
+        var sql = `INSERT INTO presentaciones (presentacion,paginas,nombreusuario)`
+        +` VALUES ('${presentacion}','${paginas}','${usuario}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve('OK');
+            }
+        });
+    });
+}
+/**
+ * Elimina el registro de la presentación en la base de datos
+ * @param {String} presentacion nombre completo de la presentación
+ * @param {String} usuario nombre de usuario
+ */
+function borraPresentacion (presentacion, usuario){ //TODO realizar comprobación de usuario
+    return new Promise(function (resolve, reject) {
+        var sql = `DELETE FROM presentaciones WHERE`
+            +` presentacion='${presentacion}' and nombreusuario='${usuario}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve('OK');
+            }
+        });
+    });
+}
+
 //con.end((error)=>{console.log(error);}); //finaliza la conexión
 //Declaración de las funciones
 module.exports = {
     buscausuario: buscausuario,
-    buscaPresentaciones: buscaPresentaciones
+    buscaPresentaciones: buscaPresentaciones,
+    creaPresentacion: creaPresentacion,
+    borraPresentacion: borraPresentacion
 };
