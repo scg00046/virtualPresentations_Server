@@ -10,11 +10,11 @@ const app = express();
 const bodyParser = require('body-parser'); //Recibe los datos enviados en los formularios
 const fileUpload = require('express-fileupload'); //Para subir ficheros
 const fs = require('fs');
+const pdfparse = require('pdf-parse'); //Obtener datos de la presentación
 const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
 const qrcode = require('qrcode');
 const http = require('http').createServer(app); //npm i http
 const io = require('socket.io')(http); //npm i socket.io
-
 
 //REST
 const puerto = 8080;
@@ -72,24 +72,24 @@ app.post(urlLogin, function (request, response) {
 	if (username && password) {
 
 		mysql.buscausuario(username).then((usuario) => {
-			console.log('El usuario buscado es: ' + usuario.nombreusuario);
-
+			//console.log('El usuario buscado es: ' + usuario.nombreusuario);
 			if (username == usuario.nombreusuario && password == usuario.password) {
-				var user = { //TODO cambiar a JSON 
+				var user = {
+					id: usuario.id,
 					nombreusuario: usuario.nombreusuario,
 					nombre: usuario.nombre,
 					apellidos: usuario.apellidos
 				};
-				//Responde con código 200 y el objeto usuario
-				response.status(200).send('OK:' + Object.values(user)); //Object values devuelve los valores separados por ,
+				response.status(200).send(user); //Responde con código 200 y el objeto usuario
+
 			} else {
-				response.send('ERROR 2: Usuario o contraseña incorrectos!');
+				response.status(403).send("Usuario o contraseña incorrectos!");
 			}
 		}).catch((error) => {
-			response.send(error);
+			response.status(500).send(error);
 		}).finally(() => { response.end(); });
 	} else {
-		response.send('ERROR 1: Intruduzca sus datos de usuario!');
+		response.status(400).send('Intruduzca sus datos de usuario!');
 		response.end();
 	}
 });
@@ -109,66 +109,99 @@ app.get(urlUsuario, function (request, response) {
 	}).finally(() => { response.end(); });
 });
 /* Subida de presentación al servidor */
-app.post(urlUsuario, function(request,response){
+app.put(urlUsuario, function (request, response) {
 	var usuario = request.params.usuario;
+	var idUsuario = request.body.id;
 	var presentacion = request.files.presentacion;
 
-	if (usuario && presentacion){
-		if (!request.files || Object.keys(request.files).length === 0 ) {
+	if (usuario && presentacion && idUsuario) {
+		if (!request.files || Object.keys(request.files).length === 0) {
 			return res.status(400).send('No se ha subido ningún archivo');
-		}else {
-			var directorioUsuario = path.join(__dirname, 'private', usuario);
-			var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion.name);
-			
-			//Comprobación directorio del usuario
-			fs.mkdir(directorioUsuario, (e)=>{
-				if (e.code=="EEXIST"){ return;
-				} else if (e){	//TODO enviar error al cliente?
-					return console.log('Error: '+e.code);
+		} else {
+			//Comprobación de usuario
+			mysql.compruebaUsuario(idUsuario, usuario).then((result) => {
+				if (result == 'OK') {
+					var directorioUsuario = path.join(__dirname, 'private', usuario);
+					var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion.name);
+
+					//Comprobación directorio del usuario
+					fs.mkdir(directorioUsuario, (e) => {
+						if (e.code == "EEXIST") {
+							return;
+						} else if (e) {
+							return console.log('Error: ' + e.code);
+						}
+						console.log('Directorio creado');
+					});
+					//Añadir presentación al directorio y a la base de datos
+					presentacion.mv(directorioPresentacion, function (err) {
+						if (err) {
+							console.error('Error al guardar la presentación: ' + err.code);
+							return res.status(500).send(err);
+						} else {
+							console.log('Presentación recibida');
+							//Obtener el número de páginas y agregarlo a la base de datos
+							pdfparse(fs.readFileSync(directorioPresentacion)).then(function (datos) {
+								var paginas = datos.numpages;
+								mysql.creaPresentacion(presentacion.name, paginas, usuario).then((respuesta) => {
+									if (respuesta == 'OK') {
+										response.status(200).send('Presentación subida');
+									} //TODO else no guardar el fichero
+								});
+							});
+						}
+					});
 				}
-				console.log('Directorio creado');
-			});
-			//Añadir presentación al directorio y a la base de datos
-			presentacion.mv(directorioPresentacion, function(err) {
-				if (err){
-					console.error('Error al guardar la presentación: '+err.code);
-					return res.status(500).send(err);
-				}
-				//TODO páginas del pdf
-				mysql.creaPresentacion(presentacion.name, paginas, usuario).then((respuesta)=>{
-					if(respuesta=='OK'){
-						res.send('Presentación subida');
-					}
-				})
-				
-			  });
+			}).catch((error) => { //El usuario no coincide o se ha producido un error en la base de datos
+				console.log('Error: ' + error);
+				//403 Forbidden
+				res.status(403).send('El usuario no está registrado');
+			}).finally(() => { response.end(); });
 		}
-	}else {
+	} else {
 		//406: no aceptable //TODO revisar códigos de respuesta
 		response.status(406).send('No se han recibido datos');
 	}
 });
 /* Eliminar presentación almacenada */
-app.delete(urlUsuario, function(request, response){
-	//TODO añadir comprobaciones 
+app.post(urlUsuario, function (request, response) {
 	var usuario = request.params.usuario;
 	var presentacion = request.body.presentacion;
-	var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
-
-	try {
-		fs.unlinkSync(directorioPresentacion);
-		console.log('Archivo borrado');
-		mysql.borraPresentacion(presentacion).then((respuesta)=>{
-			if (respuesta=='OK'){
-				res.status(200).send('Eliminado correctamente');
-			} else {
-				response.status(500).send('Error en la base de datos: '+respuesta);
+	var idUsuario = request.body.id;
+	//console.log(usuario + '--' + presentacion + '--' + idUsuario);
+	if (usuario && presentacion && idUsuario) {
+		var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
+		mysql.compruebaUsuario(idUsuario, usuario).then((result) => {
+			if (result == 'OK') {
+				try {
+					fs.unlinkSync(directorioPresentacion);
+					console.log('Archivo borrado');
+					mysql.borraPresentacion(presentacion, usuario).then((respuesta) => {
+						if (respuesta == 'OK') {
+							response.status(200).send('Eliminado correctamente');
+						}
+					}).catch((e) => {
+						//503: Service unavailable
+						console.log('Error al borrar la tupla: ' + e);
+						response.status(503).send('Error en la base de datos: ' + e);
+					});
+				} catch (err) {
+					console.error('Eliminar fichero: ' + err);
+					response.status(500).send('No se ha podido eliminar');
+				}
 			}
-		});
-	  } catch(err) {
-		console.error(err);
-		res.status(500).send('No se ha podido eliminar');
-	  }
+		}).catch((error) => { //El usuario no coincide o se ha producido un error en la base de datos
+			console.log('Error: ' + error);
+			//403 Forbidden
+			response.status(403).send('El usuario no está registrado');
+		}).finally(() => { response.end(); });
+
+	} else {
+		//406: no aceptable //TODO revisar códigos de respuesta
+		response.status(406).send('No se han recibido los parámetros necesarios');
+	}
+
+
 });
 
 /*Petición para crear sesión
@@ -250,8 +283,8 @@ io.on('connection', (socket) => {
 	});
 	//Desconexión de usuario
 	socket.on('disconnect', () => {
-	  console.log('Usuario desconectado, id:', socket.id);
-	  //io.emit(nombresesion, "desconectado");
+		console.log('Usuario desconectado, id:', socket.id);
+		//io.emit(nombresesion, "desconectado");
 	});
 });
 

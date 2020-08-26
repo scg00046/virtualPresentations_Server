@@ -28,6 +28,7 @@
     "http": "0.0.1-security",
     "mysql": "^2.18.1",
     "path": "^0.12.7",
+    "pdf-parse": "^1.1.1",
     "qrcode": "^1.4.4",
     "socket.io": "^2.3.0"
   }

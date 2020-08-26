@@ -1,9 +1,9 @@
 const mysql = require('mysql');
 /**
  * Estructura de la tabla de usuarios:
- * +--------+---------------+-----------+---------+------------+
- * |  id    | nombreusuario | password  | nombre  | apellidos  |
- * +--------+---------------+-----------+---------+------------+
+ * +------------+---------------+-----------+---------+------------+
+ * |  idusuario | nombreusuario | password  | nombre  | apellidos  |
+ * +------------+---------------+-----------+---------+------------+
  * 
  * Estructura tabla presentaciones:
  * +----------------+--------------+----------+----------------+
@@ -75,6 +75,26 @@ function buscausuario(usuario) {
 }
 
 /**
+ * Comprueba el id y el nombre de usuario
+ * @param {Number} id 
+ * @param {String} usuario 
+ */
+function compruebaUsuario(id, usuario){
+    return new Promise(function (resolve, reject) {
+        var sql = `SELECT * FROM usuarios WHERE idusuario=${id} AND nombreusuario='${usuario}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else if (result == ''){
+                reject('No se encuentra el usuario!');
+            } else {
+                resolve('OK');
+            }
+        });
+    });
+}
+
+/**
  * Busca las presentaciones disponibles en el servidor a partir del usuario
  * @param {String} usuario 
  */
@@ -99,10 +119,10 @@ function buscaPresentaciones(usuario){
  * @param {*} paginas número de páginas
  * @param {String} usuario nombre de usuario
  */
-function creaPresentacion (presentacion, paginas, usuario){ //TODO realizar comprobación de usuario
+function creaPresentacion (presentacion, paginas, usuario){
     return new Promise(function (resolve, reject) {
         var sql = `INSERT INTO presentaciones (presentacion,paginas,nombreusuario)`
-        +` VALUES ('${presentacion}','${paginas}','${usuario}';`;
+        +` VALUES ('${presentacion}','${paginas}','${usuario}');`;
         con.query(sql, function (err, result, fields) {
             if (err) {
                 reject(err);
@@ -121,10 +141,13 @@ function borraPresentacion (presentacion, usuario){ //TODO realizar comprobació
     return new Promise(function (resolve, reject) {
         var sql = `DELETE FROM presentaciones WHERE`
             +` presentacion='${presentacion}' and nombreusuario='${usuario}';`;
+        console.log('BBDD- sql: '+sql);
         con.query(sql, function (err, result, fields) {
             if (err) {
+                console.error('bbdd: '+err);
                 reject(err);
             } else {
+                console.log('BBDD: Result: '+result);
                 resolve('OK');
             }
         });
@@ -137,5 +160,6 @@ module.exports = {
     buscausuario: buscausuario,
     buscaPresentaciones: buscaPresentaciones,
     creaPresentacion: creaPresentacion,
-    borraPresentacion: borraPresentacion
+    borraPresentacion: borraPresentacion,
+    compruebaUsuario: compruebaUsuario
 };
