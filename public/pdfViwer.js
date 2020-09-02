@@ -1,144 +1,121 @@
-//socketIO
-//var socket = io('ws://localhost:8080');
+/* Copyright 2014 Mozilla Foundation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+"use strict";
+
+/** Variables */
 var socket = io();
 //Variables pdf y html
-var canvas = document.getElementById("pdf_renderer");
+var container = document.getElementById("pageContainer");
 var divqr = document.getElementById("div_qr");
 var divpdf = document.getElementById("div_pdfviwer");
 //Variables de la sesión
 var usuario = document.getElementById("usuario").innerHTML;
 var sesion = document.getElementById("nombreSocketRoom").innerHTML;
 var presentacion = document.getElementById("presentacion").innerHTML;
-var rutapdf = '/private/' + usuario + '/' + presentacion;
-//Estado inicial del visor
-var ctx = canvas.getContext('2d');
-var myState = {
-    pdf: null,
-    currentPage: 1,
-    zoom: 1
-}
+var DEFAULT_URL = '/private/' + usuario + '/' + presentacion;
 
-
-console.log("Conectado LEERPDF.JS; Sesion: " + sesion + '\r\n' + rutapdf);
+console.log("Conectado LEERPDF.JS; Sesion: " + sesion + '\r\n' + DEFAULT_URL);
 divpdf.style.display = "none"; //oculto
 divqr.style.display = "block"; //visible
 
-pdfjsLib.getDocument(rutapdf).then((pdf) => {
+/** Visualizar pdf */
+if (!pdfjsLib.getDocument || !pdfjsViewer.PDFPageView) {
+    alert("Please build the pdfjs-dist library using\n  `gulp dist-install`");
+}
 
-    myState.pdf = pdf;
+// The workerSrc property shall be specified.
+//
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-reader/build/pdf.worker.js";
+
+// Some PDFs need external cmaps.
+//
+var CMAP_URL = "/pdf-reader/cmaps/";
+var CMAP_PACKED = true;
+
+//var DEFAULT_URL = "../private/admin/example.pdf";
+var PAGE_TO_VIEW = 1;
+var SCALE = 0.9;
+var pdfDoc;
+
+var eventBus = new pdfjsViewer.EventBus();
+
+// Loading document.
+var loadingTask = pdfjsLib.getDocument({
+    url: DEFAULT_URL,
+    cMapUrl: CMAP_URL,
+    cMapPacked: CMAP_PACKED,
+});
+//Inicio
+loadingTask.promise.then(function (pdfDocument){
+    pdfDoc = pdfDocument;
     render();
 });
 
 /**
- * Función para mostrar el pdf en la web
+ * Carga la página pdf en html con las variables locales modificables 
+ * de página y zoom
  */
 function render() {
-    myState.pdf.getPage(myState.currentPage).then((page) => {
-        var viewport = page.getViewport(myState.zoom);
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        page.render({
-            canvasContext: ctx,
-            viewport: viewport
+    loadingTask.promise.then(function (pdfDocument) {
+        container.innerHTML = '';
+        // Document loaded, retrieving the page.
+        return pdfDocument.getPage(PAGE_TO_VIEW).then(function (pdfPage) {
+            console.log('render: ' + PAGE_TO_VIEW);
+            // Creating the page view with default parameters.
+            var pdfPageView = new pdfjsViewer.PDFPageView({
+                container: container,
+                id: PAGE_TO_VIEW,
+                scale: SCALE,
+                defaultViewport: pdfPage.getViewport({ scale: SCALE }),
+                eventBus: eventBus,
+                // We can enable text/annotations layers, if needed
+                textLayerFactory: new pdfjsViewer.DefaultTextLayerFactory(),
+                annotationLayerFactory: new pdfjsViewer.DefaultAnnotationLayerFactory(),
+            });
+            // Associates the actual page with the view, and drawing it
+            pdfPageView.setPdfPage(pdfPage);
+            return pdfPageView.draw();
         });
-
-    });
-}
-document.getElementById('go_previous')
-    .addEventListener('click', (e) => {
-        if (myState.pdf == null ||
-            myState.currentPage == 1) return;
-        myState.currentPage -= 1;
-        document.getElementById("current_page")
-            .value = myState.currentPage;
-        render();
-    });
-document.getElementById('go_next')
-    .addEventListener('click', (e) => {
-        if (myState.pdf == null ||
-            myState.currentPage > myState.pdf
-                ._pdfInfo.numPages)
-            return;
-
-        myState.currentPage += 1;
-        document.getElementById("current_page")
-            .value = myState.currentPage;
-        render();
     });
 
-document.getElementById('current_page')
-    .addEventListener('keypress', (e) => {
-        if (myState.pdf == null) return;
+}//fin function
 
-        // Get key code
-        var code = (e.keyCode ? e.keyCode : e.which);
 
-        // If key code matches that of the Enter key
-        if (code == 13) {
-            var desiredPage =
-                document.getElementById('current_page')
-                    .valueAsNumber;
-
-            if (desiredPage >= 1 &&
-                desiredPage <= myState.pdf
-                    ._pdfInfo.numPages) {
-                myState.currentPage = desiredPage;
-                document.getElementById("current_page")
-                    .value = desiredPage;
-                render();
-            }
-        }
-    });
-
-document.getElementById('zoom_in')
-    .addEventListener('click', (e) => {
-        if (myState.pdf == null) return;
-        myState.zoom += 0.5;
-        render();
-    });
-document.getElementById('zoom_out')
-    .addEventListener('click', (e) => {
-        if (myState.pdf == null) return;
-        myState.zoom -= 0.5;
-        render();
-    });
-window.onwheel = function (e) {
-    e.preventDefault();
-
-    if (e.ctrlKey) {
-
-        scale -= e.deltaY + 0.01;
-    } else {
-        posX -= e.deltaX * 2;
-        posY -= e.deltaY * 2;
-    }
-
-    render();
-};
+/** Funcionamiento socket */
+//TODO scroll
 /**
- * Pruebas para leer por consola el número de página a la que ir
+ * Cambia de página comprobando que la nueva está en los límites del documento
  */
-
-function cambiapagina(/*pg*/) {
+function cambiapagina(pagina) {
     console.log("function cambiapagina");
-    if (myState.pdf == null || myState.currentPage > myState.pdf._pdfInfo.numPages) {
+    if (pdfDoc == null || PAGE_TO_VIEW > pdfDoc.numPages || PAGE_TO_VIEW < 1) {
+        console.error("Petición de página inválida!");
         return;
     } else {
-        //myState.currentPage = pg;
-        document.getElementById("current_page").value = myState.currentPage;
+        PAGE_TO_VIEW = pagina;
+        document.getElementById("current_page").value = PAGE_TO_VIEW;
         render();
     }
-
-
 }
-//var p = 0;
-var ultima=0;
+var pagina = 0;
+var peticAnterior=0;
 socket.on(sesion, function (msg) {
-    var nueva = Date.now();
+    var peticNueva = Date.now();
     var user = msg.usuario;
-    //var pagina = parseInt(msg.mensaje);
-    var diferencia = nueva-ultima; //Para comprobar que no se realizan varias peticiones seguidas
-    console.log('('+nueva+', '+diferencia+')socket id :' + socket.id 
+    var diferencia = peticNueva-peticAnterior; //Para comprobar que no se realizan varias peticiones seguidas
+    console.log('('+peticNueva+', '+diferencia+')socket id :' + socket.id 
         + ' mensaje: ' + msg + ' usuario recibido:' + user);//muestra el id del socket
     
     if (user == usuario && diferencia >= 1000) {
@@ -148,55 +125,30 @@ socket.on(sesion, function (msg) {
                 divqr.style.display = "none"; //none: ocultar;
                 break;
             case "pmas":
-                myState.currentPage++;
-                cambiapagina();
+                pagina = PAGE_TO_VIEW + 1;
+                cambiapagina(pagina);
                 break;
             case "pmenos":
-                myState.currentPage--;
-                cambiapagina();
+                pagina = PAGE_TO_VIEW - 1;
+                cambiapagina(pagina);
                 break;
-
             case "zmas":
-                myState.zoom += 0.5;
+                SCALE += 0.1;
                 render();
                 break;
             case "zmenos":
-                myState.zoom -= 0.5;
+                SCALE -= 0.1;
                 render();
                 break;
             case "FIN":
-                console.log("SE HA DESCONECTADO UN USUARIO");
+                console.log("SE HA DESCONECTADO UN USUARIO"); //TODO probar que se cierra solo con la propia sesión
                 divpdf.style.display = "none"; //oculto
                 divqr.style.display = "block"; //visible
                 break;
-
             default:
                 //TODO emitir error ¿?
                 break;
         }
-        ultima = nueva;
-    }
-
-    //if (msg.usuario == socket.id){
-    /*    if (user =="adminOK"){
-            divpdf.style.display = "block"; // block: mostrar
-            divqr.style.display = "none"; //none: ocultar;
-        }*/
-    /*if (user == 'admin'){
-        
-        if (isNaN(pagina)) {
-            console.error('Parámetro no válido');
-        } else {
-            console.log('Numero de página:' + pagina + '.');
-            if (pagina!=p){ //Evita que se recargue la pagina innecesariamente
-                cambiapagina(pagina);
-                p=pagina;
-            }
-            
-        }
-    } else {
-        console.error("Los datos recibidos no son correctos");
-    }
-*/
-    
+        peticAnterior = peticNueva;
+    }    
 });

@@ -11,6 +11,7 @@ const bodyParser = require('body-parser'); //Recibe los datos enviados en los fo
 const fileUpload = require('express-fileupload'); //Para subir ficheros
 const fs = require('fs');
 const pdfparse = require('pdf-parse'); //Obtener datos de la presentación
+const pdfjsdist = require('pdfjs-dist'); //Lector pdf
 const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
 const qrcode = require('qrcode');
 const http = require('http').createServer(app); //npm i http
@@ -47,6 +48,7 @@ app.set('view engine', 'ejs');
 //app.use('/public/css', express.static(__dirname + '/css'));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/private', express.static(path.join(__dirname, 'private')));
+app.use('/pdf-reader', express.static( path.join(__dirname, 'node_modules', 'pdfjs-dist') ) );
 //app.use('/public/img', express.static(__dirname + '/img'));
 
 //Opciones para el QR
@@ -207,6 +209,7 @@ app.post(urlUsuario, function (request, response) {
 /*Petición para crear sesión
 Atributos necesarios: nombresesion; presentacion;
 */
+sesiones.push(new Sesion('admin', 'nuevaSesion', 'Presentacion de ejemplo.pdf') ); //Sesión de prueba
 app.post(urlcreaSesion, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
 	var sesion = request.body.session;
