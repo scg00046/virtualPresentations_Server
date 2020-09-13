@@ -209,7 +209,7 @@ app.post(urlUsuario, function (request, response) {
 /*Petición para crear sesión
 Atributos necesarios: nombresesion; presentacion;
 */
-sesiones.push(new Sesion('admin', 'nuevaSesion', 'Presentacion de ejemplo.pdf') ); //Sesión de prueba
+//sesiones.push(new Sesion('admin', 'nuevaSesion', 'Tema 1 Protocolos de Aplicacion de Internet.pdf') ); //Sesión de prueba
 app.post(urlcreaSesion, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
 	var sesion = request.body.session;
@@ -280,7 +280,7 @@ io.on('connection', (socket) => {
 	//io.emit('Hi!');
 	//Recepción de mensajes
 	socket.on(nombresesion, (msg) => {
-		console.log('Mensaje:', msg);
+		console.log('Mensaje ('+nombresesion+'): '+ Object.values(msg)/*msg*/);
 		//io.to(msg.usuario).emit('cambia pagina',msg);
 		io.emit(nombresesion, msg);
 	});

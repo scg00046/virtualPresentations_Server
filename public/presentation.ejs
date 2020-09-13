@@ -8,49 +8,56 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <meta name="google" content="notranslate">
     <link rel='stylesheet' type='text/css' media='screen' href="/public/style.css">
-    
+
     <link rel="stylesheet" href="/pdf-reader/web/pdf_viewer.css">
     <script src="/pdf-reader/build/pdf.js"></script>
     <script src="/pdf-reader/web/pdf_viewer.js"></script>
 </head>
 
 <body tabindex="1">
-    <!-- DIV bienvenida QR-->
-    <div id="div_qr" style="display: none;">
-        <h1>Hola <%=sesion.nombreusuario%></h1>
-        <div align="center">
-            <img src=<%=qr%> width="30%" height="30%" />
+    <main>
+        <!-- DIV bienvenida QR-->
+        <div id="div_qr" style="display: none;">
+            <h1>Hola <%=sesion.nombreusuario%></h1>
+            <div align="center">
+                <img src=<%=qr%> width="30%" height="30%" />
+            </div>
         </div>
-    </div>
 
-    <!-- DIV mostrar pdf-->
-    <div id="div_pdfviwer" style="display: none;">
-		<!--<div id="canvas_container">
-			<canvas id="pdf_renderer"></canvas>
-        </div>-->
-        <div id="pageContainer" class="pdfViewer"></div>
-		<div id="navigation_controls">
-			<button id="go_previous">Previous</button>
-			<input id="current_page" value="1" type="number" />
-			<button id="go_next">Next</button>
-			<button id="zoom_in">+</button>
-			<button id="zoom_out">-</button>
-		</div>
-    </div>
-    <!--TODO dar estilos-->
-    <!-- DIV oculto para datos de la sesión-->
-    <div id="div_ocultar" style="display: none">
-        <p id="usuario"><%=sesion.nombreusuario%></p>
-        <p id="nombreSocketRoom"><%=sesion.nombresesion%></p>
-        <p id="presentacion"><%=sesion.presentacion%></p>
-    </div>
-    <!--TODO pie de página-->
-    
+        <!-- DIV mostrar pdf-->
+        <div id="div_pdfviwer" style="display: none;">
+            <div id="div_sidebar" class="sidebar" style="margin-left: 0px;">
+                <ul id="listaNotas"></ul>
+            </div>
+            <div id="pageContainer" class="pdfViewer"></div>
+            <div id="navigation_controls">
+                <button id="go_previous">Previous</button>
+                <input id="current_page" value="1" type="number" />
+                <button id="go_next">Next</button>
+                <button id="zoom_in">+</button>
+                <button id="zoom_out">-</button>
+                <button id="showNotes">Notas</button>
+            </div>
+        </div>
+
+        <!-- DIV oculto para datos de la sesión-->
+        <div id="div_ocultar" style="display: none">
+            <p id="usuario"><%=sesion.nombreusuario%></p>
+            <p id="nombreSocketRoom"><%=sesion.nombresesion%></p>
+            <p id="presentacion"><%=sesion.presentacion%></p>
+        </div>
+    </main>
+    <footer>
+        <span>TFG: Servicio de presentación virtual controlado desde terminal móvil
+            &emsp; | &emsp;
+            Autor: Sergio Caballero Garrido &emsp; Tutor: Juan Carlos Cuevas Martínez</span>
+    </footer>
     <!-- SocketIO-->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <!--Controlador del visor-->
-	<script src="/public/pdfViwer.js" type="text/javascript"></script>
+    <script src="/public/pdfViwer.js" type="text/javascript"></script>
 
 </body>
+
 </html>
