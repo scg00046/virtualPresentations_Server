@@ -17,14 +17,14 @@
 /** Variables */
 var socket = io();
 //Variables pdf y html
-var container = document.getElementById("pageContainer");
+var container = document.getElementById("div_container");
 var divqr = document.getElementById("div_qr");
 var divpdf = document.getElementById("div_pdfviwer");
 var divsidebar = document.getElementById("div_sidebar");
 var listaNotas = document.getElementById("listaNotas");
 //Variables de la sesión
 var usuario = document.getElementById("usuario").innerHTML;
-var sesion = document.getElementById("nombreSocketRoom").innerHTML;
+var sesion = document.getElementById("nombreSesion").innerHTML;
 var presentacion = document.getElementById("presentacion").innerHTML;
 var DEFAULT_URL = '/private/' + usuario + '/' + presentacion;
 
@@ -125,14 +125,12 @@ function getScroll() {
  * @param {number} pagina número de página a la que acceder
  */
 function cambiapagina(pagina) {
-    console.log("function cambiapagina");
     if (pdfDoc == null || pagina > pdfDoc.numPages || pagina < 1) {
         console.error("Petición de página inválida!");
         enviar("Error: Página inválida!");
         //return;
     } else {
         PAGE_TO_VIEW = pagina;
-        document.getElementById("current_page").value = PAGE_TO_VIEW;
         enviar("Página: " + PAGE_TO_VIEW);
         render();
     }
@@ -160,12 +158,10 @@ function mostrarOcultar() {
         mostrar = true;
     }
 }
-document.getElementById('showNotes').addEventListener('click', mostrarOcultar);
 
 function notas(nota) {
 
     if (nota.length > 0) {
-        //console.log("nota: " + nota);
         var li = document.createElement("li");
         var date = new Date();
         var horaPag = "<em style='font-size: 12px;'>[" + date.getHours() + ":"
@@ -189,89 +185,95 @@ function eliminarNotas() {
 
 //Comunicación socket
 var peticAnterior = 0;
+//socket.on('virtualPresentations', function (msg) {
 socket.on(sesion, function (msg) {
     var peticNueva = Date.now();
     var user = msg.usuario;
+    var sessionApp = msg.sesion;
     var usuarioNota = usuario + "-nota";
     var diferencia = peticNueva - peticAnterior; //Para comprobar que no se realizan varias peticiones seguidas
-    console.log('(' + peticNueva + ', ' + diferencia + ')socket id :' + socket.id
-        + ' mensaje: ' + msg + ' usuario recibido:' + user);//muestra el id del socket
-
-    if (user == usuario && diferencia >= 300) {
-        var pagina = 0;
-        //Página específica
-        if (msg.mensaje.startsWith("pnum")) {
-            pagina = msg.mensaje.split("-")[1];
-            var p = parseInt(pagina, 10); //entero decimal
-            console.log("Pagina recibida: " + p);
-            return cambiapagina(p);
+    console.log('(' + peticNueva + ', ' + diferencia + ')socket id :' + socket.id + ', sesion: ' + sessionApp
+        + ' mensaje: ' + Object.values(msg) + ' usuario recibido:' + user);//muestra el id del socket
+    if (sessionApp == sesion) {
+        if (user == usuario && diferencia >= 150) {
+            var pagina = 0;
+            //Página específica
+            if (msg.mensaje.startsWith("pnum")) {
+                pagina = msg.mensaje.split("-")[1];
+                var p = parseInt(pagina, 10); //entero decimal
+                console.log("Pagina recibida: " + p);
+                return cambiapagina(p);
+            }
+            switch (msg.mensaje) {
+                case "OK":
+                    divpdf.style.display = "block"; // block: mostrar
+                    divqr.style.display = "none"; //none: ocultar;
+                    enviar("Página: " + PAGE_TO_VIEW);
+                    break;
+                case "pmas":
+                    pagina = PAGE_TO_VIEW + 1;
+                    cambiapagina(pagina);
+                    break;
+                case "pmenos":
+                    pagina = PAGE_TO_VIEW - 1;
+                    cambiapagina(pagina);
+                    break;
+                case "zmas":
+                    SCALE += 0.1;
+                    render();
+                    break;
+                case "zmenos":
+                    SCALE -= 0.1;
+                    render();
+                    break;
+                case "zinicial":
+                    window.scrollTo({ top: 0, left: 0 });
+                    SCALE = SCALE_INIT;
+                    render();
+                    break;
+                case "subir":
+                    window.scrollBy({
+                        top: -50,
+                        left: 0
+                    });
+                    break;
+                case "bajar":
+                    window.scrollBy({
+                        top: 50,
+                        left: 0
+                    });
+                    break;
+                case "izquierda":
+                    window.scrollBy({
+                        top: 0,
+                        left: -50
+                    });
+                    break;
+                case "derecha":
+                    window.scrollBy({
+                        top: 0,
+                        left: 50
+                    });
+                    break;
+                case "muestraNotas":
+                    mostrarOcultar();
+                    break;
+                case "eliminaNotas":
+                    eliminarNotas();
+                    break;
+                case "FIN":
+                    console.log("Fin de la sesión");
+                    divpdf.style.display = "none"; //oculto
+                    divqr.style.display = "block"; //visible
+                    break;
+                default:
+                    enviar("Comando no reconocido");
+                    break;
+            }
+            peticAnterior = peticNueva;
+        } else if (user == usuarioNota && diferencia >= 300) {
+            notas(msg.mensaje);
         }
-        switch (msg.mensaje) {
-            case "OK":
-                divpdf.style.display = "block"; // block: mostrar
-                divqr.style.display = "none"; //none: ocultar;
-                enviar("Página: " + PAGE_TO_VIEW);
-                break;
-            case "pmas":
-                pagina = PAGE_TO_VIEW + 1;
-                cambiapagina(pagina);
-                break;
-            case "pmenos":
-                pagina = PAGE_TO_VIEW - 1;
-                cambiapagina(pagina);
-                break;
-            case "zmas":
-                SCALE += 0.1;
-                render();
-                break;
-            case "zmenos":
-                SCALE -= 0.1;
-                render();
-                break;
-            case "zinicial":
-                window.scrollTo({top:0, left:0});
-                SCALE = SCALE_INIT;
-                render();
-                break;
-            case "subir":
-                window.scrollBy({
-                    top: -50,
-                    left: 0
-                });
-                break;
-            case "bajar":
-                window.scrollBy({
-                    top: 50,
-                    left: 0
-                });
-                break;
-            case "izquierda":
-                window.scrollBy({
-                    top: 0,
-                    left: -50
-                });
-                break;
-            case "derecha":
-                window.scrollBy({
-                    top: 0,
-                    left: 50
-                });
-                break;
-            case "muestra_oculta":
-                mostrarOcultar();
-                break;
-            case "FIN":
-                console.log("SE HA DESCONECTADO UN USUARIO"); //TODO probar que se cierra solo con la propia sesión
-                divpdf.style.display = "none"; //oculto
-                divqr.style.display = "block"; //visible
-                break;
-            default:
-                //TODO emitir error ¿?
-                break;
-        }
-        peticAnterior = peticNueva;
-    } else if (user == usuarioNota && diferencia >= 300) {
-        notas(msg.mensaje);
     }
 });
 
@@ -281,8 +283,9 @@ socket.on(sesion, function (msg) {
  */
 function enviar(texto) {
     var mensaje = {
-        usuario: 'web',
+        sesion: sesion,
+        usuario: 'web', //TODO añadir nombre de sesion
         mensaje: texto
     }
-    socket.emit(sesion, mensaje);
+    socket.emit("virtualPresentations", mensaje);
 }

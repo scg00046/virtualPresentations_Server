@@ -137,7 +137,7 @@ function creaPresentacion (presentacion, paginas, usuario){
  * @param {String} presentacion nombre completo de la presentación
  * @param {String} usuario nombre de usuario
  */
-function borraPresentacion (presentacion, usuario){ //TODO realizar comprobación de usuario
+function borraPresentacion (presentacion, usuario){
     return new Promise(function (resolve, reject) {
         var sql = `DELETE FROM presentaciones WHERE`
             +` presentacion='${presentacion}' and nombreusuario='${usuario}';`;

@@ -1,12 +1,3 @@
-#canvas_container {
-	width: 100%;
-	height: 90%;
-	overflow: auto;
-	background: rgb(129, 153, 204);
-	text-align: center;
-	border: solid 3px;
-}
-
 html, body {
     height: 100%;
     margin: 0;
@@ -24,6 +15,18 @@ footer {
     text-align: center;
     padding: 10px;
 }
+/* div QR */
+#div_qr {
+    text-align: center;
+}
+#div_qr>h1 {
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    text-align: left;
+    padding: 10px;
+    padding-left: 20px;
+    text-shadow: 1px 1px #027507;
+}
+
 
 /* Sidebar */
 .sidebar {
@@ -33,10 +36,23 @@ footer {
     top: 0;
     left: 0;
     z-index: 1;
-    background-color: #89c493;
+    background-color: #ECECED;
     overflow-x: hidden;
     transition: 0.4s;
     padding: 1rem 0;
     box-sizing:border-box;
 }
 
+/* Estilos para los errores*/
+.error{
+    text-align: center;
+    padding-top: 50px;
+}
+h1.error{
+    color: red;
+    text-shadow: 2px 2px 3px rgb(97, 97, 97);
+}
+h2.error{
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    color: black;
+}

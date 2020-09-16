@@ -24,8 +24,8 @@ const rutadef = '/virtualpresentation';
  * /virtualpresentation/usuario */
 const urlLogin = rutadef + '/usuario';
 /** (get) devuelve presentaciones almacenadas
- *  (post) almacena una nueva presentación
- *  (delete) elimina una presentación
+ *  (put) almacena una nueva presentación
+ *  (post) elimina una presentación
  * /virtualpresentation/:usuario */
 const urlUsuario = rutadef + '/:usuario';
 /** Crear y borrar (delete) sesión
@@ -48,7 +48,7 @@ app.set('view engine', 'ejs');
 //app.use('/public/css', express.static(__dirname + '/css'));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/private', express.static(path.join(__dirname, 'private')));
-app.use('/pdf-reader', express.static( path.join(__dirname, 'node_modules', 'pdfjs-dist') ) );
+app.use('/pdf-reader', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist')));
 //app.use('/public/img', express.static(__dirname + '/img'));
 
 //Opciones para el QR
@@ -59,7 +59,7 @@ const qrOp = {
 	margin: 1,
 	color: {
 		dark: "#027507FF",
-		light: "#DEDEDEFF"
+		light: "#FFFFFFFF"
 	}
 }
 
@@ -67,7 +67,7 @@ const qrOp = {
 app.get(urlLogin, function (request, response) {
 	response.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
-
+/* Acceso de credenciales */
 app.post(urlLogin, function (request, response) {
 	var username = request.body.user;
 	var password = request.body.password;
@@ -178,6 +178,10 @@ app.post(urlUsuario, function (request, response) {
 				try {
 					fs.unlinkSync(directorioPresentacion);
 					console.log('Archivo borrado');
+					var pos = buscaSesionPresentacion(usuario, presentacion);
+					if (pos != -1) {
+						sesiones.splice(pos, 1); //Elimina la sesión para dicha presentación
+					}
 					mysql.borraPresentacion(presentacion, usuario).then((respuesta) => {
 						if (respuesta == 'OK') {
 							response.status(200).send('Eliminado correctamente');
@@ -212,18 +216,31 @@ Atributos necesarios: nombresesion; presentacion;
 //sesiones.push(new Sesion('admin', 'nuevaSesion', 'Tema 1 Protocolos de Aplicacion de Internet.pdf') ); //Sesión de prueba
 app.post(urlcreaSesion, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
-	var sesion = request.body.session;
+	var sesion_req = request.body.session;
 	var presentacion = request.body.presentation;
-	//console.log('usuario: ' + usuario + ', sesion: ' + sesion + ', presentacion: ' + presentacion);
-	//if (sesion && presentacion) {
-	if (usuario && sesion && presentacion) {
-		if (buscaSesion(usuario, sesion) != -1) {
-			response.status(400).send('La sesión ya existe');
+	console.log('Crea sesion');
+	//console.log('usuario: ' + usuario + ', sesion: ' + sesion_req + ', presentacion: ' + presentacion);
+	if (usuario && sesion_req && presentacion) {
+		if (buscaSesion(usuario, sesion_req) != -1) {
+			sesiones.forEach(function (s, i) {
+				if (s.nombreusuario == usuario && s.presentacion == presentacion && s.nombresesion == sesion_req) {
+					console.log('La sesión ya existe');
+					return response.status(400).send('La sesión ya existe');
+				} else if (s.nombreusuario == usuario && s.presentacion != presentacion && s.nombresesion == sesion_req) {
+					console.log('Actualiza la sesión');
+					//Elimina sesión y la crea de nuevo con la presentación actualizada
+					sesiones.splice(i, 1);
+					var sesion = new Sesion(usuario, sesion_req, presentacion);
+					sesiones.push(sesion);
+					//301: Movido permanentemente
+					return response.status(301).send('Se ha actualizado la sesión');
+				}
+			});
 		} else {
-			var sesion = new Sesion(usuario, sesion, presentacion);
+			var sesion = new Sesion(usuario, sesion_req, presentacion);
 			sesiones.push(sesion);
-			console.log(sesiones);
-			//response.status(200).send(sesiones); //Prueba
+			//console.log(sesiones); //pruebas
+			console.log("Se ha creado la sesión"); 
 			response.status(200).send('Sesión creada');
 		}
 	} else {
@@ -250,11 +267,10 @@ app.delete(urlcreaSesion, function (request, response) {
 
 /* Mostrará un código qr (con el nombre de la sesión y usuario)
 	y redirecciona cuando reciba OK de la aplicación */
-//TODO añadir comprobaciones antes de mostrar qr coincide usuario 
-var nombresesion = "";
+//var nombresesion = "";
 app.get(urlpresentacion, function (request, response) {
 	var usuario = request.params.usuario;
-	nombresesion = request.params.nombresesion;
+	var nombresesion = request.params.nombresesion;
 	var index = buscaSesion(usuario, nombresesion);
 
 	if (index != -1) {
@@ -265,7 +281,8 @@ app.get(urlpresentacion, function (request, response) {
 			response.render(path.join(__dirname, 'public', 'presentation.ejs'), { 'sesion': sesion, 'qr': url });
 		});
 	} else {
-		response.status(404).send('La sesión no existe');
+		//response.status(404).send('La sesión no existe');
+		response.status(404).render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
 	}
 });
 
@@ -276,18 +293,22 @@ http://localhost:${puerto}/virtualpresentation`)
 
 // Conexión de clientes socket
 io.on('connection', (socket) => {
-	console.log('Room socket: ' + nombresesion + '; Usuario conectado, id:', socket.id);
+	//console.log('Room socket: ' + nombresesion + '; Usuario conectado, id:', socket.id);
+	console.log('Usuario conectado: ' + socket.id);
 	//io.emit('Hi!');
 	//Recepción de mensajes
-	socket.on(nombresesion, (msg) => {
-		console.log('Mensaje ('+nombresesion+'): '+ Object.values(msg)/*msg*/);
+	socket.on('virtualPresentations', (msg) => {
+		var nombresesion = msg.sesion;
+		console.log('Mensaje (' + nombresesion + '): ' + Object.values(msg)/*msg*/);
+		//console.log('Mensaje: '+ Object.values(msg));
 		//io.to(msg.usuario).emit('cambia pagina',msg);
+		//io.emit('virtualPresentations', msg);
 		io.emit(nombresesion, msg);
 	});
 	//Desconexión de usuario
 	socket.on('disconnect', () => {
 		console.log('Usuario desconectado, id:', socket.id);
-		//io.emit(nombresesion, "desconectado");
+		//io.emit('virtualPresentations', "desconectado");
 	});
 });
 
@@ -308,8 +329,20 @@ function Sesion(usuario, sesion, presentacion) {
 function buscaSesion(usuario, sesion) {
 	var index = -1;
 	sesiones.forEach(function (s, i) {
-		console.log(i + ' - ' + s.nombresesion);
+		//console.log(i + ' - ' + s.nombresesion);
 		if (s.nombreusuario == usuario && s.nombresesion == sesion) {
+			//console.log('Coincide usuario y sesion');
+			index = i;
+		}
+	});
+	return index;
+}
+
+function buscaSesionPresentacion(usuario, presentacion) {
+	var index = -1;
+	sesiones.forEach(function (s, i) {
+		//console.log(i + ' - ' + s.nombresesion);
+		if (s.nombreusuario == usuario && s.presentacion == presentacion) {
 			//console.log('Coincide usuario y sesion');
 			index = i;
 		}

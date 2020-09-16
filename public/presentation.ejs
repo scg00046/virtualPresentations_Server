@@ -8,6 +8,7 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <meta name="google" content="notranslate">
     <link rel='stylesheet' type='text/css' media='screen' href="/public/style.css">
+    <link rel="icon" type="image/x-icon" href="/public/uja.ico">
 
     <link rel="stylesheet" href="/pdf-reader/web/pdf_viewer.css">
     <script src="/pdf-reader/build/pdf.js"></script>
@@ -18,9 +19,9 @@
     <main>
         <!-- DIV bienvenida QR-->
         <div id="div_qr" style="display: none;">
-            <h1>Hola <%=sesion.nombreusuario%></h1>
-            <div align="center">
-                <img src=<%=qr%> width="30%" height="30%" />
+            <h1>Bienvenido <%=sesion.nombreusuario%></h1>
+            <div>
+                <img src=<%=qr%> width="35%" height="35%" />
             </div>
         </div>
 
@@ -29,24 +30,17 @@
             <div id="div_sidebar" class="sidebar" style="margin-left: 0px;">
                 <ul id="listaNotas"></ul>
             </div>
-            <div id="pageContainer" class="pdfViewer"></div>
-            <div id="navigation_controls">
-                <button id="go_previous">Previous</button>
-                <input id="current_page" value="1" type="number" />
-                <button id="go_next">Next</button>
-                <button id="zoom_in">+</button>
-                <button id="zoom_out">-</button>
-                <button id="showNotes">Notas</button>
-            </div>
+            <div id="div_container" class="pdfViewer"></div>
         </div>
 
         <!-- DIV oculto para datos de la sesión-->
         <div id="div_ocultar" style="display: none">
             <p id="usuario"><%=sesion.nombreusuario%></p>
-            <p id="nombreSocketRoom"><%=sesion.nombresesion%></p>
+            <p id="nombreSesion"><%=sesion.nombresesion%></p>
             <p id="presentacion"><%=sesion.presentacion%></p>
         </div>
     </main>
+    <!-- Pie de página -->
     <footer>
         <span>TFG: Servicio de presentación virtual controlado desde terminal móvil
             &emsp; | &emsp;
