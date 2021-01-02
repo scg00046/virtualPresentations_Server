@@ -17,16 +17,20 @@
 /** Variables */
 var socket = io();
 //Variables pdf y html
+var header = document.getElementsByTagName("header");
 var container = document.getElementById("div_container");
 var divqr = document.getElementById("div_qr");
 var divpdf = document.getElementById("div_pdfviwer");
 var divsidebar = document.getElementById("div_sidebar");
 var listaNotas = document.getElementById("listaNotas");
+var notasFijas = document.getElementById("notasFijas");
 //Variables de la sesión
 var usuario = document.getElementById("usuario").innerHTML;
 var sesion = document.getElementById("nombreSesion").innerHTML;
 var presentacion = document.getElementById("presentacion").innerHTML;
-var DEFAULT_URL = '/private/' + usuario + '/' + presentacion;
+
+const DEFAULT_URL = '/private/' + usuario + '/' + presentacion;
+const TIEMPO_PETICIONES = 150;
 
 console.log("Conectado LEERPDF.JS; Sesion: " + sesion + '\r\n' + DEFAULT_URL);
 divpdf.style.display = "none"; //oculto
@@ -164,18 +168,26 @@ function notas(nota) {
     if (nota.length > 0) {
         var li = document.createElement("li");
         var date = new Date();
+        var minutos = date.getMinutes();
+        if (minutos < 10 ){
+            minutos = '0'+minutos;
+        }
         var horaPag = "<em style='font-size: 12px;'>[" + date.getHours() + ":"
-            + date.getMinutes() + " - P." + PAGE_TO_VIEW + "]</em><br>";
+            + minutos + " - P." + PAGE_TO_VIEW + "]</em><br>";
         li.innerHTML = horaPag + nota;
         listaNotas.appendChild(li);
-
-        /*boton de notificación
-        if (mostrar) {
-          numero++;
-          notificacion.innerHTML = numero;
-          notificacion.style.display = "block";
-        }*/
     }
+}
+
+function notafija(nota) {
+
+    if (nota.length > 0) {
+        var li = document.createElement("li");
+        var hoy = "<em style='font-size: 12px;'>[hoy] </em> ";
+        li.innerHTML = hoy + nota;
+        notasFijas.appendChild(li);
+    }
+
 }
 
 function eliminarNotas() {
@@ -195,7 +207,7 @@ socket.on(sesion, function (msg) {
     console.log('(' + peticNueva + ', ' + diferencia + ')socket id :' + socket.id + ', sesion: ' + sessionApp
         + ' mensaje: ' + Object.values(msg) + ' usuario recibido:' + user);//muestra el id del socket
     if (sessionApp == sesion) {
-        if (user == usuario && diferencia >= 150) {
+        if (user == usuario && diferencia >= TIEMPO_PETICIONES) {
             var pagina = 0;
             //Página específica
             if (msg.mensaje.startsWith("pnum")) {
@@ -208,6 +220,7 @@ socket.on(sesion, function (msg) {
                 case "OK":
                     divpdf.style.display = "block"; // block: mostrar
                     divqr.style.display = "none"; //none: ocultar;
+                    header[0].style.display = "none";
                     enviar("Página: " + PAGE_TO_VIEW);
                     break;
                 case "pmas":
@@ -263,16 +276,21 @@ socket.on(sesion, function (msg) {
                     break;
                 case "FIN":
                     console.log("Fin de la sesión");
-                    divpdf.style.display = "none"; //oculto
-                    divqr.style.display = "block"; //visible
+                    var url = location.href;
+                    window.location.replace(url);
                     break;
                 default:
                     enviar("Comando no reconocido");
                     break;
             }
             peticAnterior = peticNueva;
-        } else if (user == usuarioNota && diferencia >= 300) {
-            notas(msg.mensaje);
+        } else if (user == usuarioNota && diferencia >= TIEMPO_PETICIONES) {
+            if (msg.fijar) { //TODO revisar nombres
+                notafija(msg.nota); //------------------------------------------------------------------
+            } else {
+                notas(msg.nota);
+            }
+            
         }
     }
 });
@@ -282,10 +300,30 @@ socket.on(sesion, function (msg) {
  * @param {String} texto 
  */
 function enviar(texto) {
+    var usuarioWeb = "web-" + usuario;
     var mensaje = {
         sesion: sesion,
-        usuario: 'web', //TODO añadir nombre de sesion
+        usuario: usuarioWeb,
         mensaje: texto
     }
     socket.emit("virtualPresentations", mensaje);
 }
+
+//pregunta si desea salir
+window.addEventListener("beforeunload", function (e) {
+    var confirmationMessage = "\o/";
+    e.returnValue = confirmationMessage;     // Gecko, Trident, Chrome 34+
+    return confirmationMessage;              // Gecko, WebKit, Chrome <34
+  });
+
+//al cerrar/recargar la página
+window.onunload = function () {
+    enviar("salir");
+}
+
+//Abre todos los enlaces en una nueva página
+document.addEventListener("click", function (e) {
+    if (e.target.tagName == "A"){
+        e.target.setAttribute("target", "_blank");
+    } 
+});

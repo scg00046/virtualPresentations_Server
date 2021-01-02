@@ -4,7 +4,7 @@
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>Presenación virtual</title>
+    <title>Presentación virtual</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <meta name="google" content="notranslate">
     <link rel='stylesheet' type='text/css' media='screen' href="/public/style.css">
@@ -13,23 +13,59 @@
     <link rel="stylesheet" href="/pdf-reader/web/pdf_viewer.css">
     <script src="/pdf-reader/build/pdf.js"></script>
     <script src="/pdf-reader/web/pdf_viewer.js"></script>
+    <style>
+        #notas_button {
+            border-top: double green;
+        }
+        #notasFijas li::marker{
+            content: "✔";
+            color: green;
+        }
+    </style>
 </head>
 
 <body tabindex="1">
+    <header>
+        <div class="header_left">
+            <img class="uja_logo" src="/public/images/uja_logo_p.png" width="175" height="43"
+                alt="logo de la Universidad de Jaén">
+        </div>
+        <div class="header_center">
+            <h1>Presentación virtual</h1>
+        </div>
+        <div class="header_right">
+            <h3>Usuario:</h3>
+            <h3 style="color: grey;"><%=sesion.nombreusuario%></h3>
+        </div>
+    </header>
     <main>
         <!-- DIV bienvenida QR-->
         <div id="div_qr" style="display: none;">
-            <h1>Bienvenido <%=sesion.nombreusuario%></h1>
+            <h3>Escanéa este código QR mediante la aplicación "Presentación virtual" con un usuario autenticado</h3>
             <div>
-                <img src=<%=qr%> width="35%" height="35%" />
+                <img src=<%=qr%> width="32%" height="32%" />
             </div>
         </div>
 
-        <!-- DIV mostrar pdf-->
+        <!-- DIV presentación-->
         <div id="div_pdfviwer" style="display: none;">
+            <!-- DIV lista de notas -->
             <div id="div_sidebar" class="sidebar" style="margin-left: 0px;">
-                <ul id="listaNotas"></ul>
+                <div id="nota_top" style="float: inline-start">
+                    <ul id="listaNotas"></ul>
+                </div>
+                <div id="notas_button" style="float: inline-end;">
+                    <ul id="notasFijas">
+                        <li>Nota 1</li>
+                        <li>-----------</li>
+                        <% for (var i = 0; i < listaNotas.length; i++) { %>
+                        <li><em style='font-size: 12px;'>[<%=listaNotas[i].fecha%>] </em>
+                            <%=listaNotas[i].nota%></li>
+                        <% } %>
+                    </ul>
+                </div>
             </div>
+            <!-- Contenedor del documento -->
             <div id="div_container" class="pdfViewer"></div>
         </div>
 

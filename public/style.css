@@ -1,6 +1,8 @@
 html, body {
     height: 100%;
     margin: 0;
+    line-height: 1.15; /* 1 */
+    -webkit-text-size-adjust: 100%; /* 2 */
 }
 body {
     display: flex;
@@ -15,18 +17,33 @@ footer {
     text-align: center;
     padding: 10px;
 }
+
+/* Cabecera */
+header{
+    margin-left: 10%;
+    margin-right: 10%;
+    margin-top: 1%;
+    padding: 10px;
+}
+.header_left{
+    display: inline-block;
+}
+.header_center{
+    margin-left: 20px;
+    display: inline-block;
+    font-size: 1em;
+    text-align: center;
+}
+.header_right{
+    text-align: right;
+    float: right;
+}
+
 /* div QR */
 #div_qr {
     text-align: center;
-}
-#div_qr>h1 {
     font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
-    text-align: left;
-    padding: 10px;
-    padding-left: 20px;
-    text-shadow: 1px 1px #027507;
 }
-
 
 /* Sidebar */
 .sidebar {

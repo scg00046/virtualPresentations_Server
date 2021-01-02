@@ -93,6 +93,35 @@ function compruebaUsuario(id, usuario){
         });
     });
 }
+/**
+ * Comprueba si el id y usuario es correcto y posteriormente si está registrada la presentación
+ * Si no existe la presentación se resolverá con OK
+ * En caso contrario 'reject' indicando que ya existe 
+ * @param {number} id 
+ * @param {String} usuario 
+ * @param {String} presentacion 
+ */
+function compruebaUsuarioyPresentacion(id, usuario, presentacion){
+    return new Promise(function (resolve, reject) {
+        compruebaUsuario(id, usuario).then(resp=>{
+            if(resp == 'OK'){
+                var sql = `SELECT idpresentacion, presentacion, paginas, nombreusuario AS autor `
+                +` FROM presentaciones WHERE nombreusuario='${usuario}' AND presentacion='${presentacion}';`;
+                con.query(sql, function (err, result, fields) {
+                    if (err) {
+                        reject(err);
+                    } else if (result == '') {
+                        resolve('OK');
+                    } else {
+                        reject('La presentación ya existe');
+                    }
+                });
+            }
+        }).catch(e=>{
+            reject(e);
+        });
+    });
+}
 
 /**
  * Busca las presentaciones disponibles en el servidor a partir del usuario
@@ -125,7 +154,8 @@ function creaPresentacion (presentacion, paginas, usuario){
         +` VALUES ('${presentacion}','${paginas}','${usuario}');`;
         con.query(sql, function (err, result, fields) {
             if (err) {
-                reject(err);
+                console.log('pres bbdd:',err);
+                reject('ERROR',err);
             } else {
                 resolve('OK');
             }
@@ -141,25 +171,22 @@ function borraPresentacion (presentacion, usuario){
     return new Promise(function (resolve, reject) {
         var sql = `DELETE FROM presentaciones WHERE`
             +` presentacion='${presentacion}' and nombreusuario='${usuario}';`;
-        console.log('BBDD- sql: '+sql);
         con.query(sql, function (err, result, fields) {
             if (err) {
-                console.error('bbdd: '+err);
                 reject(err);
             } else {
-                console.log('BBDD: Result: '+result);
                 resolve('OK');
             }
         });
     });
 }
 
-//con.end((error)=>{console.log(error);}); //finaliza la conexión
 //Declaración de las funciones
 module.exports = {
     buscausuario: buscausuario,
     buscaPresentaciones: buscaPresentaciones,
     creaPresentacion: creaPresentacion,
     borraPresentacion: borraPresentacion,
-    compruebaUsuario: compruebaUsuario
+    compruebaUsuario: compruebaUsuario,
+    compruebaUsuarioyPresentacion: compruebaUsuarioyPresentacion
 };

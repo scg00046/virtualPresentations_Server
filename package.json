@@ -6,6 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "nodemonConfig": {
+    "ignore": ["private/*"],
+    "delay": "2500"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scg00046/virtualPresentations_Server.git"

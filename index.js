@@ -83,32 +83,37 @@ app.post(urlLogin, function (request, response) {
 					apellidos: usuario.apellidos
 				};
 				response.status(200).send(user); //Responde con código 200 y el objeto usuario
-
 			} else {
-				response.status(403).send("Usuario o contraseña incorrectos!");
+				response.status(401).send("Usuario o contraseña incorrectos!");
 			}
 		}).catch((error) => {
-			response.status(500).send(error);
-		}).finally(() => { response.end(); });
+			if (error == 'No se encuentra el usuario!') {
+				response.status(401).send("Usuario o contraseña incorrectos!");
+			} else {
+				response.status(500).send(error);
+			}
+		});
 	} else {
 		response.status(400).send('Intruduzca sus datos de usuario!');
-		response.end();
 	}
 });
 
 /* Petición get a /virtualpresentation/usuario
 	Devuelve las presentaciones almacenadas para seleccionarla 
 	desde la aplicación */
-app.get(urlUsuario, function (request, response) {
+app.get(urlUsuario, function (request, response) { //TODO añadir id
 	var usuario = request.params.usuario;
 	var hora = new Date().getHours() + ':' + new Date().getMinutes();
 	console.log(hora + " Petición de presentaciones: " + usuario);
 	mysql.buscaPresentaciones(usuario).then((listaPresentaciones) => {
-		//response.status(200).send(listaPresentaciones);
 		response.status(200).send(listaPresentaciones);
 	}).catch((error) => {
-		response.status(404).send(error);
-	}).finally(() => { response.end(); });
+		if (error = 'No se encuentra el usuario!') {
+			response.status(401).send("No hay presentaciones para el usuario");
+		} else {
+			response.status(500).send(error);
+		}
+	});
 });
 /* Subida de presentación al servidor */
 app.put(urlUsuario, function (request, response) {
@@ -118,51 +123,81 @@ app.put(urlUsuario, function (request, response) {
 
 	if (usuario && presentacion && idUsuario) {
 		if (!request.files || Object.keys(request.files).length === 0) {
-			return res.status(400).send('No se ha subido ningún archivo');
+			return response.status(400).send('No se ha subido ningún archivo');
 		} else {
 			//Comprobación de usuario
-			mysql.compruebaUsuario(idUsuario, usuario).then((result) => {
+			mysql.compruebaUsuarioyPresentacion(idUsuario, usuario, presentacion.name).then((result) => {
+				console.log('user present',result);
 				if (result == 'OK') {
 					var directorioUsuario = path.join(__dirname, 'private', usuario);
 					var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion.name);
 
 					//Comprobación directorio del usuario
 					fs.mkdir(directorioUsuario, (e) => {
+						/*console.log('directorio: ',e);
 						if (e.code == "EEXIST") {
 							return;
 						} else if (e) {
 							return console.log('Error: ' + e.code);
 						}
-						console.log('Directorio creado');
+						console.log('Directorio creado');*/
 					});
 					//Añadir presentación al directorio y a la base de datos
 					presentacion.mv(directorioPresentacion, function (err) {
 						if (err) {
 							console.error('Error al guardar la presentación: ' + err.code);
-							return res.status(500).send(err);
+							return response.status(500).send(err);
 						} else {
-							console.log('Presentación recibida');
+							console.log('Presentación almacenada');
 							//Obtener el número de páginas y agregarlo a la base de datos
 							pdfparse(fs.readFileSync(directorioPresentacion)).then(function (datos) {
 								var paginas = datos.numpages;
+								console.log('numero de paginas',paginas);
 								mysql.creaPresentacion(presentacion.name, paginas, usuario).then((respuesta) => {
 									if (respuesta == 'OK') {
-										response.status(200).send('Presentación subida');
-									} //TODO else no guardar el fichero
+										console.log('registro en bbdd');
+										//crear json para notas fijas
+										var notasPresentacion = presentacion.name.split('.')[0] + '.json';
+										var listaNotas = path.join(directorioUsuario, notasPresentacion);
+										fs.writeFile(listaNotas, '[]', function (err) {
+											if (err) return err;
+											console.log('DONE');
+										});
+
+										response.status(200).send('Presentación almacenada');
+									}
+								}).catch(e => {
+									console.error('error 167', e);
+									if (e.toString().startsWith('ERROR')) {
+										console.error('Error en el registro en la bbdd: ', e);
+										try {
+											fs.unlinkSync(directorioPresentacion);
+										} catch (err) {
+											console.error('Error al Eliminar fichero: ' + err);
+											//response.status(500).send('No se ha podido eliminar');
+										}
+										return e;
+									}
 								});
 							});
 						}
 					});
 				}
-			}).catch((error) => { //El usuario no coincide o se ha producido un error en la base de datos
+			}).catch((error) => { //El usuario no coincide, la presentación está registrada o se ha producido un error en la base de datos
 				console.log('Error: ' + error);
-				//403 Forbidden
-				res.status(403).send('El usuario no está registrado');
-			}).finally(() => { response.end(); });
+				if (error == 'No se encuentra el usuario!') {
+					//403 Forbidden
+					response.status(403).send('El usuario no está registrado');
+				} else if (error == 'La presentación ya existe' ){
+					response.status(406).send(error);
+				}else {
+					response.status(500).send(error);
+				}
+			});
 		}
 	} else {
 		//406: no aceptable //TODO revisar códigos de respuesta
-		response.status(406).send('No se han recibido datos');
+		response.status(400).send('No se han recibido datos');
 	}
 });
 /* Eliminar presentación almacenada */
@@ -170,14 +205,17 @@ app.post(urlUsuario, function (request, response) {
 	var usuario = request.params.usuario;
 	var presentacion = request.body.presentacion;
 	var idUsuario = request.body.id;
-	//console.log(usuario + '--' + presentacion + '--' + idUsuario);
+
 	if (usuario && presentacion && idUsuario) {
-		var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
+		
 		mysql.compruebaUsuario(idUsuario, usuario).then((result) => {
 			if (result == 'OK') {
+				var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
 				try {
 					fs.unlinkSync(directorioPresentacion);
-					console.log('Archivo borrado');
+					var notasPresentacion = presentacion.split('.')[0] + '.json';
+					var listaNotas = path.join(__dirname, 'private', usuario, notasPresentacion);
+					fs.unlinkSync(listaNotas);
 					var pos = buscaSesionPresentacion(usuario, presentacion);
 					if (pos != -1) {
 						sesiones.splice(pos, 1); //Elimina la sesión para dicha presentación
@@ -188,11 +226,9 @@ app.post(urlUsuario, function (request, response) {
 						}
 					}).catch((e) => {
 						//503: Service unavailable
-						console.log('Error al borrar la tupla: ' + e);
 						response.status(503).send('Error en la base de datos: ' + e);
 					});
 				} catch (err) {
-					console.error('Eliminar fichero: ' + err);
 					response.status(500).send('No se ha podido eliminar');
 				}
 			}
@@ -200,7 +236,7 @@ app.post(urlUsuario, function (request, response) {
 			console.log('Error: ' + error);
 			//403 Forbidden
 			response.status(403).send('El usuario no está registrado');
-		}).finally(() => { response.end(); });
+		});
 
 	} else {
 		//406: no aceptable //TODO revisar códigos de respuesta
@@ -240,7 +276,7 @@ app.post(urlcreaSesion, function (request, response) {
 			var sesion = new Sesion(usuario, sesion_req, presentacion);
 			sesiones.push(sesion);
 			//console.log(sesiones); //pruebas
-			console.log("Se ha creado la sesión"); 
+			console.log("Se ha creado la sesión");
 			response.status(200).send('Sesión creada');
 		}
 	} else {
@@ -248,20 +284,34 @@ app.post(urlcreaSesion, function (request, response) {
 		response.status(406).send('No se han recibido datos');
 	}
 });
+
 //Finaliza la sesión
-//TODO comprobar usuario y contraseña
 app.delete(urlcreaSesion, function (request, response) {
 	var usuario = request.params.usuario;
-	var sesion = request.body.session;
-	//var presentacion = request.body.presentation;
-	var pos = buscaSesion(usuario, sesion);
-	if (pos != -1) {
-		sesiones.splice(pos, 1);
-		//response.send(sesiones);
-		response.status(200).send('Sesión borrada');
+	var sesion = request.headers.session;
+	var id = request.headers.id;
+	console.log("Delete Session, usuario " + usuario + " sesion: " + sesion + " id: " + id);
+	if (usuario && sesion && id) {
+		mysql.compruebaUsuario(id, usuario).then((result) => {
+			if (result == 'OK') {
+				var pos = buscaSesion(usuario, sesion);
+				if (pos != -1) {
+					sesiones.splice(pos, 1);
+					//response.send(sesiones);
+					response.status(200).send('Sesión borrada');
+				} else {
+					//409: conflict
+					response.status(409).send('La sesión no existe');
+				}
+			}
+		}).catch((error) => { //El usuario no coincide o se ha producido un error en la base de datos
+			console.log('Error: ' + error);
+			//403 Forbidden
+			response.status(403).send('El usuario no está registrado');
+		});
 	} else {
-		//409: conflict
-		response.status(409).send('La sesión no existe');
+		//406: no aceptable //TODO revisar códigos de respuesta
+		response.status(406).send('No se han recibido los parámetros necesarios');
 	}
 });
 
@@ -278,11 +328,15 @@ app.get(urlpresentacion, function (request, response) {
 		var jsonSesion = JSON.stringify(sesion);
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
 			//console.log(url);
-			response.render(path.join(__dirname, 'public', 'presentation.ejs'), { 'sesion': sesion, 'qr': url });
+			var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
+			var rutaNotas = path.join(__dirname, 'private', sesion.nombreusuario, notasPresentacion);
+			var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
+			console.log('notas', listaNotas);
+			response.render(path.join(__dirname, 'public', 'presentation.ejs'),
+				{ 'sesion': sesion, 'qr': url, 'listaNotas': listaNotas });
 		});
 	} else {
-		//response.status(404).send('La sesión no existe');
-		response.status(404).render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
+		response.render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
 	}
 });
 
@@ -303,6 +357,25 @@ io.on('connection', (socket) => {
 		//console.log('Mensaje: '+ Object.values(msg));
 		//io.to(msg.usuario).emit('cambia pagina',msg);
 		//io.emit('virtualPresentations', msg);
+		if (msg.fijar) {
+			console.log('nota a fijar');
+			var usuario = msg.usuario.split('-')[0];
+			var index = buscaSesion(usuario, msg.sesion);
+			if (index != -1) {
+				var s = sesiones[index];
+				//console.log(sesiones[index].presentacion);
+				var notasPresentacion = s.presentacion.split('.')[0] + '.json';
+				var rutaNotas = path.join(__dirname, 'private', s.nombreusuario, notasPresentacion);
+				var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
+				nota = {
+					fecha: getFecha(),
+					nota: msg.nota
+				}
+				listaNotas.push(nota);
+				fs.writeFileSync(rutaNotas, JSON.stringify(listaNotas, null, 1));
+			}
+
+		}
 		io.emit(nombresesion, msg);
 	});
 	//Desconexión de usuario
@@ -311,6 +384,11 @@ io.on('connection', (socket) => {
 		//io.emit('virtualPresentations', "desconectado");
 	});
 });
+
+function getFecha() {
+	var hoy = new Date();
+	return hoy.getDate() + '/' + (hoy.getMonth() + 1) + '/' + hoy.getFullYear();
+}
 
 
 /* Sesión */

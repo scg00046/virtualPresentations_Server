@@ -4,17 +4,26 @@
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>Presenación virtual</title>
+    <title>Presentación virtual</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <meta name="google" content="notranslate">
     <link rel='stylesheet' type='text/css' media='screen' href="/public/style.css">
+    <link rel="stylesheet" href="http://labtelema.ujaen.es/css/normalize.css">
     <link rel="icon" type="image/x-icon" href="/public/uja.ico" />
 </head>
 
 <body>
+    <header>
+        <div class="header_left">
+            <img class="uja_logo" src="/public/images/uja_logo_p.png" width="175" height="43" alt="logo de la Universidad de Jaén">
+        </div>
+        <div class="header_center">
+            <h1>Presentación virtual</h1>
+        </div>
+    </header>
     <main>
-        <h1 class="error">Error 404</h1>
-        <h2 class="error">La sesión: '<%=sesion%>' no existe para el usaurio <%=usuario%></h2>
+        <h1 class="error">Sesión caducada</h1>
+        <h2 class="error">La sesión: '<%=sesion%>' no está disponible para el usaurio <%=usuario%></h2>
 
     </main>
     <footer>
