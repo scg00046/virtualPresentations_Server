@@ -16,6 +16,7 @@ const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
 const qrcode = require('qrcode');
 const http = require('http').createServer(app); //npm i http
 const io = require('socket.io')(http); //npm i socket.io
+const random = require('randomstring');
 
 //REST
 const puerto = 8080;
@@ -323,17 +324,22 @@ app.get(urlpresentacion, function (request, response) {
 	var nombresesion = request.params.nombresesion;
 	var index = buscaSesion(usuario, nombresesion);
 
+	var rand = random.generate({
+		length: 5,
+		charset: 'alphanumeric'
+	  });
 	if (index != -1) {
 		var sesion = sesiones[index];
+		sesion.codigo = rand;
 		var jsonSesion = JSON.stringify(sesion);
+		var sesionCodigo = sesion.nombresesion+'_'+rand;
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
 			//console.log(url);
 			var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
 			var rutaNotas = path.join(__dirname, 'private', sesion.nombreusuario, notasPresentacion);
 			var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
-			console.log('notas', listaNotas);
 			response.render(path.join(__dirname, 'public', 'presentation.ejs'),
-				{ 'sesion': sesion, 'qr': url, 'listaNotas': listaNotas });
+				{ 'sesion': sesion, 'qr': url, 'listaNotas': listaNotas, 'sesionCodigo': sesionCodigo });
 		});
 	} else {
 		response.render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
@@ -359,8 +365,9 @@ io.on('connection', (socket) => {
 		//io.emit('virtualPresentations', msg);
 		if (msg.fijar) {
 			console.log('nota a fijar');
-			var usuario = msg.usuario.split('-')[0];
-			var index = buscaSesion(usuario, msg.sesion);
+			//var usuario = msg.usuario.split('-')[0]; //usuario sin '-nota'
+			var s = msg.sesion.split('_')[0]; //Sesión sin el código
+			var index = buscaSesion(msg.usuario, s);
 			if (index != -1) {
 				var s = sesiones[index];
 				//console.log(sesiones[index].presentacion);

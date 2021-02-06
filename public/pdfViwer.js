@@ -32,7 +32,7 @@ var presentacion = document.getElementById("presentacion").innerHTML;
 const DEFAULT_URL = '/private/' + usuario + '/' + presentacion;
 const TIEMPO_PETICIONES = 150;
 
-console.log("Conectado LEERPDF.JS; Sesion: " + sesion + '\r\n' + DEFAULT_URL);
+//console.log("Conectado LEERPDF.JS; Sesion: " + sesion + '\r\n' + DEFAULT_URL);
 divpdf.style.display = "none"; //oculto
 divqr.style.display = "block"; //visible
 
@@ -169,8 +169,8 @@ function notas(nota) {
         var li = document.createElement("li");
         var date = new Date();
         var minutos = date.getMinutes();
-        if (minutos < 10 ){
-            minutos = '0'+minutos;
+        if (minutos < 10) {
+            minutos = '0' + minutos;
         }
         var horaPag = "<em style='font-size: 12px;'>[" + date.getHours() + ":"
             + minutos + " - P." + PAGE_TO_VIEW + "]</em><br>";
@@ -202,18 +202,18 @@ socket.on(sesion, function (msg) {
     var peticNueva = Date.now();
     var user = msg.usuario;
     var sessionApp = msg.sesion;
-    var usuarioNota = usuario + "-nota";
+    //var usuarioNota = usuario + "-nota";
     var diferencia = peticNueva - peticAnterior; //Para comprobar que no se realizan varias peticiones seguidas
-    console.log('(' + peticNueva + ', ' + diferencia + ')socket id :' + socket.id + ', sesion: ' + sessionApp
-        + ' mensaje: ' + Object.values(msg) + ' usuario recibido:' + user);//muestra el id del socket
+    //console.log('(' + peticNueva + ', ' + diferencia + ')socket id :' + socket.id + ', sesion: ' + sessionApp
+    //    + ' mensaje: ' + Object.values(msg) + ' usuario recibido:' + user);//muestra el id del socket
     if (sessionApp == sesion) {
-        if (user == usuario && diferencia >= TIEMPO_PETICIONES) {
+        if (user == usuario && diferencia >= TIEMPO_PETICIONES && msg.mensaje) {
             var pagina = 0;
             //Página específica
             if (msg.mensaje.startsWith("pnum")) {
                 pagina = msg.mensaje.split("-")[1];
                 var p = parseInt(pagina, 10); //entero decimal
-                console.log("Pagina recibida: " + p);
+                //console.log("Pagina recibida: " + p);
                 return cambiapagina(p);
             }
             switch (msg.mensaje) {
@@ -275,28 +275,30 @@ socket.on(sesion, function (msg) {
                     eliminarNotas();
                     break;
                 case "FIN":
-                    console.log("Fin de la sesión");
-                    var url = location.href;
-                    window.location.replace(url);
+                    setTimeout(() => {
+                        var url = location.href;
+                        window.location.replace(url);
+                    }, 800);
                     break;
                 default:
                     enviar("Comando no reconocido");
                     break;
             }
             peticAnterior = peticNueva;
-        } else if (user == usuarioNota && diferencia >= TIEMPO_PETICIONES) {
+        } else if (msg.nota && diferencia >= TIEMPO_PETICIONES) {
+            console.log('nota');
             if (msg.fijar) { //TODO revisar nombres
                 notafija(msg.nota); //------------------------------------------------------------------
             } else {
                 notas(msg.nota);
             }
-            
         }
     }
 });
 
 /**
- * Envía datos a la aplicación móvil
+ * Envía datos a la aplicación móvil con el usuario "web-" seguido del usuario.
+ * Enviado exclusivamente a la sesión definida
  * @param {String} texto 
  */
 function enviar(texto) {
@@ -314,7 +316,7 @@ window.addEventListener("beforeunload", function (e) {
     var confirmationMessage = "\o/";
     e.returnValue = confirmationMessage;     // Gecko, Trident, Chrome 34+
     return confirmationMessage;              // Gecko, WebKit, Chrome <34
-  });
+});
 
 //al cerrar/recargar la página
 window.onunload = function () {
@@ -323,7 +325,7 @@ window.onunload = function () {
 
 //Abre todos los enlaces en una nueva página
 document.addEventListener("click", function (e) {
-    if (e.target.tagName == "A"){
+    if (e.target.tagName == "A") {
         e.target.setAttribute("target", "_blank");
-    } 
+    }
 });
