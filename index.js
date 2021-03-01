@@ -17,6 +17,7 @@ const qrcode = require('qrcode');
 const http = require('http').createServer(app); //npm i http
 const io = require('socket.io')(http); //npm i socket.io
 const random = require('randomstring');
+const swaggerUi = require('swagger-ui-express');
 
 //REST
 const puerto = 8080;
@@ -51,6 +52,17 @@ app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/private', express.static(path.join(__dirname, 'private')));
 app.use('/pdf-reader', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist')));
 //app.use('/public/img', express.static(__dirname + '/img'));
+
+//Documentación de la API
+const swaggerDocument = require('./public/swagger.json');
+var swaggerOptions = {
+	explorer: true,
+	customCss: '.swagger-ui .topbar { display: none }',
+	swaggerOptions: {
+	  url: `http://localhost:8080/virtualpresentation/swagger.json`
+	}
+  };
+app.use(rutadef+'/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 
 //Opciones para el QR
 const qrOp = {
@@ -227,7 +239,7 @@ app.post(urlUsuario, function (request, response) {
 						}
 					}).catch((e) => {
 						//503: Service unavailable
-						response.status(503).send('Error en la base de datos: ' + e);
+						response.status(500).send('Error en la base de datos: ' + e);
 					});
 				} catch (err) {
 					response.status(500).send('No se ha podido eliminar');
@@ -269,7 +281,7 @@ app.post(urlcreaSesion, function (request, response) {
 					sesiones.splice(i, 1);
 					var sesion = new Sesion(usuario, sesion_req, presentacion);
 					sesiones.push(sesion);
-					//301: Movido permanentemente
+					//301: Movido permanentemente //TODO revisar
 					return response.status(301).send('Se ha actualizado la sesión');
 				}
 			});
@@ -338,11 +350,11 @@ app.get(urlpresentacion, function (request, response) {
 			var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
 			var rutaNotas = path.join(__dirname, 'private', sesion.nombreusuario, notasPresentacion);
 			var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
-			response.render(path.join(__dirname, 'public', 'presentation.ejs'),
+			response.status(200).render(path.join(__dirname, 'public', 'presentation.ejs'),
 				{ 'sesion': sesion, 'qr': url, 'listaNotas': listaNotas, 'sesionCodigo': sesionCodigo });
 		});
 	} else {
-		response.render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
+		response.status(500).render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
 	}
 });
 

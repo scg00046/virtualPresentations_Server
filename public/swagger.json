@@ -1,0 +1,510 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "This is a sample server Petstore server.  You can find out more about     Swagger at [http://swagger.io](http://swagger.io) or on [irc.freenode.net, #swagger](http://swagger.io/irc/).      For this sample, you can use the api key `special-key` to test the authorization     filters.",
+    "version": "1.0.0",
+    "title": "TFG: Presentacion virtual",
+    "contact": {
+      "name": "Sergio Caballero Garrido",
+      "email": "scg00046@red.ujaen.es"
+    }
+  },
+  "externalDocs": {
+    "description": "Find out more about Swagger",
+    "url": "http://swagger.io"
+  },
+  "host": "localhost:8080",
+  "basePath": "/virtualpresentation",
+  "tags": [
+    {
+      "name": "Usuario",
+      "description": "Datos del usuario, login, etc"
+    },
+    {
+      "name": "Presentaciones",
+      "description": "Acceso y listado de presentaciones"
+    },
+    {
+      "name": "Sesiones",
+      "description": "Permite crear y eliminar sesiones"
+    },
+    {
+      "name": "Portal",
+      "description": "Portal de presentación",
+      "externalDocs": {
+        "description": "Find out more about our store",
+        "url": "http://swagger.io"
+      }
+    }
+  ],
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/usuario": {
+      "post": {
+        "tags": [
+          "Usuario"
+        ],
+        "summary": "Autenticación en la aplicación",
+        "description": "Permite autenticarse en la aplicación y obtener los datos del usuario",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "User",
+            "description": "Datos de autenticación",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Autenticacion"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Información del usuario",
+            "schema": {
+              "$ref": "#/definitions/Usuario"
+            }
+          },
+          "400": {
+            "description": "No se han recibido datos de usuario",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "401": {
+            "description": "Usuario o contraseña incorrecto",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      }
+    },
+    "/{usuario}": {
+      "get": {
+        "tags": [
+          "Presentaciones"
+        ],
+        "summary": "Autenticación en la aplicación",
+        "description": "Consulta la lista de presentaciones registradas",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/Usuario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Información del usuario",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Presentacion"
+              }
+            }
+          },
+          "400": {
+            "description": "No se han recibido datos de usuario",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "401": {
+            "description": "Usuario o contraseña incorrecto",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Presentaciones"
+        ],
+        "summary": "Almacena nueva presentación en el servidor",
+        "description": "Consulta la lista de presentaciones registradas",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/Usuario"
+          },
+          {
+            "in": "formData",
+            "name": "idUsuario",
+            "type": "integer"
+          },
+          {
+            "in": "formData",
+            "name": "presentacion",
+            "description": "Presentacion a almacenar",
+            "type": "file"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presentacion almacenada",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "400": {
+            "description": "No se han recibido datos de usuario",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "403": {
+            "description": "Usuario no registrado",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "406": {
+            "description": "La presentación ya existe",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Presentaciones"
+        ],
+        "summary": "Elimina presentación",
+        "description": "Elimina la presentación seleccionda, así como el listado de notas permanentes",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/Usuario"
+          },
+          {
+            "in": "body",
+            "name": "idUsuario",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "idUsuario": {
+                  "type": "integer"
+                },
+                "presentacion": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presentacion eliminada",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "400": {
+            "description": "No se han recibido datos de usuario",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "403": {
+            "description": "Usuario no registrado",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "406": {
+            "description": "La presentación ya existe",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      }
+    },
+    "/session/{usuario}": {
+      "post": {
+        "tags": [
+          "Sesiones"
+        ],
+        "summary": "Crea nueva sesión",
+        "description": "Permite generar una sesión para el usuario",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/Usuario"
+          },
+          {
+            "in": "body",
+            "name": "Sesión",
+            "description": "Datos de autenticación",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "string"
+                },
+                "presentacion": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesión creada",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "301": {
+            "description": "Sesión actualizada. Actualiza la sesión con la presentación definida",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "400": {
+            "description": "La sesión ya existe",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "406": {
+            "$ref": "#/responses/datos_insuficientes"
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sesiones"
+        ],
+        "summary": "Elimina sesión",
+        "description": "Permite autenticarse en la aplicación y obtener los datos del usuario",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/Usuario"
+          },
+          {
+            "in": "header",
+            "name": "session",
+            "description": "Nombre de la sesión a eliminar",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "header",
+            "name": "id",
+            "description": "Identificador de usuario",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesión borrada",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "403": {
+            "description": "El usuario no es correcto",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "406": {
+            "$ref": "#/responses/datos_insuficientes"
+          },
+          "409": {
+            "description": "La sesión no existe",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      }
+    },
+    "/{usuario}/{sesion}": {
+      "get": {
+        "tags": [
+          "Portal"
+        ],
+        "summary": "Autenticación en la aplicación",
+        "description": "Consulta la lista de presentaciones registradas",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "text/html"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/Usuario"
+          },
+          {
+            "$ref": "#/parameters/Sesion"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portal de presentación",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Presentacion"
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "petstore_auth": {
+      "type": "oauth2",
+      "authorizationUrl": "http://petstore.swagger.io/oauth/dialog",
+      "flow": "implicit",
+      "scopes": {
+        "write:pets": "modify pets in your account",
+        "read:pets": "read your pets"
+      }
+    },
+    "api_key": {
+      "type": "apiKey",
+      "name": "api_key",
+      "in": "header"
+    }
+  },
+  "definitions": {
+    "Usuario": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "nombreusuario": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "apellidos": {
+          "type": "string"
+        }
+      }
+    },
+    "Autenticacion": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "description": "Nick de usuario",
+          "type": "string"
+        },
+        "password": {
+          "type": "string",
+          "format": "password"
+        }
+      }
+    },
+    "Presentacion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "nombrepresentacion": {
+          "type": "string"
+        },
+        "numpags": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  "parameters": {
+    "Usuario": {
+      "in": "path",
+      "name": "usuario",
+      "description": "Nick de usuario",
+      "required": true,
+      "type": "string"
+    },
+    "Sesion": {
+      "in": "path",
+      "name": "sesion",
+      "description": "Nombre de la sesión",
+      "required": true,
+      "type": "string"
+    }
+  },
+  "responses": {
+    "500": {
+      "description": "Error en el servidor",
+      "schema": {
+        "type": "string"
+      }
+    },
+    "datos_insuficientes": {
+      "description": "No se han recibido datos",
+      "schema": {
+        "type": "string"
+      }
+    }
+  }
+}
