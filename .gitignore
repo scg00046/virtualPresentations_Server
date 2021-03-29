@@ -1,2 +1,8 @@
 #Carpeta de presentaciones
 private/
+
+#Visual Studio Code
+.vscode
+
+#NodeJS
+package-lock.json

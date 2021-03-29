@@ -88,6 +88,53 @@
             "$ref": "#/responses/500"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "Usuario"
+        ],
+        "summary": "Registro de usuario",
+        "description": "Permite registrarse en la aplicación",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "User",
+            "description": "Datos de usuario",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Usuario"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registro completo",
+            "schema": {
+              "$ref": "#/definitions/Usuario"
+            }
+          },
+          "400": {
+            "description": "No se han recibido datos de usuario",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "401": {
+            "description": "Usuario o contraseña incorrecto",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
       }
     },
     "/{usuario}": {
@@ -95,7 +142,12 @@
         "tags": [
           "Presentaciones"
         ],
-        "summary": "Autenticación en la aplicación",
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Listado de presentaciones",
         "description": "Consulta la lista de presentaciones registradas",
         "consumes": [
           "application/json"
@@ -139,6 +191,11 @@
         "tags": [
           "Presentaciones"
         ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Almacena nueva presentación en el servidor",
         "description": "Consulta la lista de presentaciones registradas",
         "consumes": [
@@ -150,11 +207,6 @@
         "parameters": [
           {
             "$ref": "#/parameters/Usuario"
-          },
-          {
-            "in": "formData",
-            "name": "idUsuario",
-            "type": "integer"
           },
           {
             "in": "formData",
@@ -193,9 +245,14 @@
           }
         }
       },
-      "post": {
+      "delete": {
         "tags": [
           "Presentaciones"
+        ],
+        "security": [
+          {
+            "token": []
+          }
         ],
         "summary": "Elimina presentación",
         "description": "Elimina la presentación seleccionda, así como el listado de notas permanentes",
@@ -210,19 +267,11 @@
             "$ref": "#/parameters/Usuario"
           },
           {
-            "in": "body",
-            "name": "idUsuario",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "idUsuario": {
-                  "type": "integer"
-                },
-                "presentacion": {
-                  "type": "string"
-                }
-              }
-            }
+            "in": "header",
+            "name": "presentación",
+            "required": true,
+            "description": "Nombre de la presentación a eliminar",
+            "type": "string"
           }
         ],
         "responses": {
@@ -261,6 +310,11 @@
         "tags": [
           "Sesiones"
         ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Crea nueva sesión",
         "description": "Permite generar una sesión para el usuario",
         "consumes": [
@@ -279,15 +333,7 @@
             "description": "Datos de autenticación",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "session": {
-                  "type": "string"
-                },
-                "presentacion": {
-                  "type": "string"
-                }
-              }
+              "$ref": "#/definitions/Sesion"
             }
           }
         ],
@@ -322,6 +368,11 @@
         "tags": [
           "Sesiones"
         ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Elimina sesión",
         "description": "Permite autenticarse en la aplicación y obtener los datos del usuario",
         "consumes": [
@@ -340,13 +391,6 @@
             "description": "Nombre de la sesión a eliminar",
             "required": true,
             "type": "string"
-          },
-          {
-            "in": "header",
-            "name": "id",
-            "description": "Identificador de usuario",
-            "required": true,
-            "type": "integer"
           }
         ],
         "responses": {
@@ -400,35 +444,21 @@
         ],
         "responses": {
           "200": {
-            "description": "Portal de presentación",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Presentacion"
-              }
-            }
+            "description": "Portal de presentación"
           },
           "500": {
-            "$ref": "#/responses/500"
+            "description": "Error en la sesión"
           }
         }
       }
     }
   },
   "securityDefinitions": {
-    "petstore_auth": {
-      "type": "oauth2",
-      "authorizationUrl": "http://petstore.swagger.io/oauth/dialog",
-      "flow": "implicit",
-      "scopes": {
-        "write:pets": "modify pets in your account",
-        "read:pets": "read your pets"
-      }
-    },
-    "api_key": {
+    "token": {
       "type": "apiKey",
-      "name": "api_key",
-      "in": "header"
+      "name": "Autenticacion",
+      "in": "header",
+      "required": true
     }
   },
   "definitions": {
@@ -445,6 +475,9 @@
           "type": "string"
         },
         "apellidos": {
+          "type": "string"
+        },
+        "token": {
           "type": "string"
         }
       }
@@ -473,6 +506,17 @@
         },
         "numpags": {
           "type": "integer"
+        }
+      }
+    },
+    "Sesion":{
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string"
+        },
+        "presentation": {
+          "type": "string"
         }
       }
     }

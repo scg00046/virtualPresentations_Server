@@ -18,6 +18,9 @@ const http = require('http').createServer(app); //npm i http
 const io = require('socket.io')(http); //npm i socket.io
 const random = require('randomstring');
 const swaggerUi = require('swagger-ui-express');
+const jwt = require('jwt-simple');
+
+const midd = require('./middleware');
 
 //REST
 const puerto = 8080;
@@ -59,10 +62,10 @@ var swaggerOptions = {
 	explorer: true,
 	customCss: '.swagger-ui .topbar { display: none }',
 	swaggerOptions: {
-	  url: `http://localhost:8080/virtualpresentation/swagger.json`
+		url: `http://localhost:8080/virtualpresentation/swagger.json`
 	}
-  };
-app.use(rutadef+'/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
+};
+app.use(rutadef + '/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 
 //Opciones para el QR
 const qrOp = {
@@ -76,10 +79,30 @@ const qrOp = {
 	}
 }
 
-// Formulario de login (web)
-app.get(urlLogin, function (request, response) {
-	response.sendFile(path.join(__dirname, 'public', 'login.html'));
+/* Registro de usuario */
+app.put(urlLogin, function (request, response) {
+	var usuario = request.body;
+
+	if (usuario) {
+		mysql.buscausuario(usuario.nombreusuario).then((usuario) => {
+			response.status(401).send("El usuario ya existe");
+		}).catch((error) => {
+			if (error == 'No se encuentra el usuario!') {
+				mysql.registraUsuario(usuario).then(function (resp) {
+					response.status(200).send(resp);
+				}).catch((error) => {
+					response.status(500).send(error);
+				});
+			} else {
+				response.status(500).send(error);
+			}
+		});
+	} else {
+		response.status(406).send('No se han recibido datos');
+	}
+
 });
+
 /* Acceso de credenciales */
 app.post(urlLogin, function (request, response) {
 	var username = request.body.user;
@@ -90,12 +113,20 @@ app.post(urlLogin, function (request, response) {
 			//console.log('El usuario buscado es: ' + usuario.nombreusuario);
 			if (username == usuario.nombreusuario && password == usuario.password) {
 				var user = {
+					fecha: new Date(),
 					id: usuario.id,
 					nombreusuario: usuario.nombreusuario,
 					nombre: usuario.nombre,
 					apellidos: usuario.apellidos
 				};
-				response.status(200).send(user); //Responde con código 200 y el objeto usuario
+				var token = jwt.encode(user, midd.TAG);
+				delete user['fecha'];
+				user['token'] = token;
+				mysql.actualizaToken(user.id, token).then(r => {
+					response.status(200).send(user); //Responde con código 200 y el objeto usuario
+				}).catch(err => {
+					response.status(500).send(err);
+				});
 			} else {
 				response.status(401).send("Usuario o contraseña incorrectos!");
 			}
@@ -114,33 +145,36 @@ app.post(urlLogin, function (request, response) {
 /* Petición get a /virtualpresentation/usuario
 	Devuelve las presentaciones almacenadas para seleccionarla 
 	desde la aplicación */
-app.get(urlUsuario, function (request, response) { //TODO añadir id
+app.get(urlUsuario, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario;
 	var hora = new Date().getHours() + ':' + new Date().getMinutes();
 	console.log(hora + " Petición de presentaciones: " + usuario);
-	mysql.buscaPresentaciones(usuario).then((listaPresentaciones) => {
-		response.status(200).send(listaPresentaciones);
-	}).catch((error) => {
-		if (error = 'No se encuentra el usuario!') {
-			response.status(401).send("No hay presentaciones para el usuario");
-		} else {
-			response.status(500).send(error);
-		}
-	});
+	if (usuario == request.usuario) {
+		mysql.buscaPresentaciones(request.usuario).then((listaPresentaciones) => {
+			response.status(200).send(listaPresentaciones);
+		}).catch((error) => {
+			if (error = 'No se encuentra el usuario!') {
+				response.status(401).send("No hay presentaciones para el usuario");
+			} else {
+				response.status(500).send(error);
+			}
+		});
+	} else {
+		response.status(500).send('No tiene permiso para ver la lista de presentaciones del usuario');//TODO REVISAR
+	}
 });
 /* Subida de presentación al servidor */
-app.put(urlUsuario, function (request, response) {
+app.put(urlUsuario, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario;
-	var idUsuario = request.body.id;
 	var presentacion = request.files.presentacion;
-
-	if (usuario && presentacion && idUsuario) {
+	
+	if (usuario == request.usuario && presentacion) {
 		if (!request.files || Object.keys(request.files).length === 0) {
 			return response.status(400).send('No se ha subido ningún archivo');
 		} else {
 			//Comprobación de usuario
-			mysql.compruebaUsuarioyPresentacion(idUsuario, usuario, presentacion.name).then((result) => {
-				console.log('user present',result);
+			mysql.compruebaPresentacion(request.usuario, presentacion.name).then((result) => {
+
 				if (result == 'OK') {
 					var directorioUsuario = path.join(__dirname, 'private', usuario);
 					var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion.name);
@@ -165,7 +199,7 @@ app.put(urlUsuario, function (request, response) {
 							//Obtener el número de páginas y agregarlo a la base de datos
 							pdfparse(fs.readFileSync(directorioPresentacion)).then(function (datos) {
 								var paginas = datos.numpages;
-								console.log('numero de paginas',paginas);
+								console.log('numero de paginas', paginas);
 								mysql.creaPresentacion(presentacion.name, paginas, usuario).then((respuesta) => {
 									if (respuesta == 'OK') {
 										console.log('registro en bbdd');
@@ -184,6 +218,7 @@ app.put(urlUsuario, function (request, response) {
 									if (e.toString().startsWith('ERROR')) {
 										console.error('Error en el registro en la bbdd: ', e);
 										try {
+											//Elimina el fichero si no se ha podido registrar
 											fs.unlinkSync(directorioPresentacion);
 										} catch (err) {
 											console.error('Error al Eliminar fichero: ' + err);
@@ -201,9 +236,9 @@ app.put(urlUsuario, function (request, response) {
 				if (error == 'No se encuentra el usuario!') {
 					//403 Forbidden
 					response.status(403).send('El usuario no está registrado');
-				} else if (error == 'La presentación ya existe' ){
+				} else if (error == 'La presentación ya existe') {
 					response.status(406).send(error);
-				}else {
+				} else {
 					response.status(500).send(error);
 				}
 			});
@@ -214,62 +249,50 @@ app.put(urlUsuario, function (request, response) {
 	}
 });
 /* Eliminar presentación almacenada */
-app.post(urlUsuario, function (request, response) {
+app.delete(urlUsuario, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario;
-	var presentacion = request.body.presentacion;
-	var idUsuario = request.body.id;
+	var presentacion = request.headers.presentacion;
 
-	if (usuario && presentacion && idUsuario) {
-		
-		mysql.compruebaUsuario(idUsuario, usuario).then((result) => {
-			if (result == 'OK') {
-				var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
-				try {
-					fs.unlinkSync(directorioPresentacion);
-					var notasPresentacion = presentacion.split('.')[0] + '.json';
-					var listaNotas = path.join(__dirname, 'private', usuario, notasPresentacion);
-					fs.unlinkSync(listaNotas);
-					var pos = buscaSesionPresentacion(usuario, presentacion);
-					if (pos != -1) {
-						sesiones.splice(pos, 1); //Elimina la sesión para dicha presentación
-					}
-					mysql.borraPresentacion(presentacion, usuario).then((respuesta) => {
-						if (respuesta == 'OK') {
-							response.status(200).send('Eliminado correctamente');
-						}
-					}).catch((e) => {
-						//503: Service unavailable
-						response.status(500).send('Error en la base de datos: ' + e);
-					});
-				} catch (err) {
-					response.status(500).send('No se ha podido eliminar');
-				}
+	if (usuario == request.usuario && presentacion) {
+
+		var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
+		try {
+			fs.unlinkSync(directorioPresentacion);
+			var notasPresentacion = presentacion.split('.')[0] + '.json';
+			var listaNotas = path.join(__dirname, 'private', usuario, notasPresentacion);
+			fs.unlinkSync(listaNotas);
+			var pos = buscaSesionPresentacion(usuario, presentacion);
+			if (pos != -1) {
+				sesiones.splice(pos, 1); //Elimina la sesión para dicha presentación
 			}
-		}).catch((error) => { //El usuario no coincide o se ha producido un error en la base de datos
-			console.log('Error: ' + error);
-			//403 Forbidden
-			response.status(403).send('El usuario no está registrado');
-		});
+			mysql.borraPresentacion(presentacion, usuario).then((respuesta) => {
+				if (respuesta == 'OK') {
+					response.status(200).send('Eliminado correctamente');
+				}
+			}).catch((e) => {
+				//503: Service unavailable
+				response.status(500).send('Error en la base de datos: ' + e);
+			});
+		} catch (err) {
+			response.status(500).send('No se ha podido eliminar');
+		}
 
 	} else {
 		//406: no aceptable //TODO revisar códigos de respuesta
 		response.status(406).send('No se han recibido los parámetros necesarios');
 	}
-
-
 });
 
 /*Petición para crear sesión
 Atributos necesarios: nombresesion; presentacion;
 */
 //sesiones.push(new Sesion('admin', 'nuevaSesion', 'Tema 1 Protocolos de Aplicacion de Internet.pdf') ); //Sesión de prueba
-app.post(urlcreaSesion, function (request, response) {
+app.post(urlcreaSesion, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
 	var sesion_req = request.body.session;
 	var presentacion = request.body.presentation;
-	console.log('Crea sesion');
 	//console.log('usuario: ' + usuario + ', sesion: ' + sesion_req + ', presentacion: ' + presentacion);
-	if (usuario && sesion_req && presentacion) {
+	if (usuario == request.usuario && sesion_req && presentacion) {
 		if (buscaSesion(usuario, sesion_req) != -1) {
 			sesiones.forEach(function (s, i) {
 				if (s.nombreusuario == usuario && s.presentacion == presentacion && s.nombresesion == sesion_req) {
@@ -288,7 +311,6 @@ app.post(urlcreaSesion, function (request, response) {
 		} else {
 			var sesion = new Sesion(usuario, sesion_req, presentacion);
 			sesiones.push(sesion);
-			//console.log(sesiones); //pruebas
 			console.log("Se ha creado la sesión");
 			response.status(200).send('Sesión creada');
 		}
@@ -299,29 +321,22 @@ app.post(urlcreaSesion, function (request, response) {
 });
 
 //Finaliza la sesión
-app.delete(urlcreaSesion, function (request, response) {
+app.delete(urlcreaSesion, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario;
 	var sesion = request.headers.session;
-	var id = request.headers.id;
-	console.log("Delete Session, usuario " + usuario + " sesion: " + sesion + " id: " + id);
-	if (usuario && sesion && id) {
-		mysql.compruebaUsuario(id, usuario).then((result) => {
-			if (result == 'OK') {
-				var pos = buscaSesion(usuario, sesion);
-				if (pos != -1) {
-					sesiones.splice(pos, 1);
-					//response.send(sesiones);
-					response.status(200).send('Sesión borrada');
-				} else {
-					//409: conflict
-					response.status(409).send('La sesión no existe');
-				}
-			}
-		}).catch((error) => { //El usuario no coincide o se ha producido un error en la base de datos
-			console.log('Error: ' + error);
-			//403 Forbidden
-			response.status(403).send('El usuario no está registrado');
-		});
+	
+	console.log("Delete Session, usuario " + usuario + " sesion: " + sesion);
+	if (usuario == request.usuario && sesion) {
+
+		var pos = buscaSesion(usuario, sesion);
+		if (pos != -1) {
+			sesiones.splice(pos, 1);
+			response.status(200).send('Sesión borrada');
+		} else {
+			//409: conflict
+			response.status(409).send('La sesión no existe');
+		}
+
 	} else {
 		//406: no aceptable //TODO revisar códigos de respuesta
 		response.status(406).send('No se han recibido los parámetros necesarios');
@@ -330,7 +345,6 @@ app.delete(urlcreaSesion, function (request, response) {
 
 /* Mostrará un código qr (con el nombre de la sesión y usuario)
 	y redirecciona cuando reciba OK de la aplicación */
-//var nombresesion = "";
 app.get(urlpresentacion, function (request, response) {
 	var usuario = request.params.usuario;
 	var nombresesion = request.params.nombresesion;
@@ -339,12 +353,12 @@ app.get(urlpresentacion, function (request, response) {
 	var rand = random.generate({
 		length: 5,
 		charset: 'alphanumeric'
-	  });
+	});
 	if (index != -1) {
 		var sesion = sesiones[index];
 		sesion.codigo = rand;
 		var jsonSesion = JSON.stringify(sesion);
-		var sesionCodigo = sesion.nombresesion+'_'+rand;
+		var sesionCodigo = sesion.nombresesion + '_' + rand;
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
 			//console.log(url);
 			var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
@@ -372,7 +386,6 @@ io.on('connection', (socket) => {
 	socket.on('virtualPresentations', (msg) => {
 		var nombresesion = msg.sesion;
 		console.log('Mensaje (' + nombresesion + '): ' + Object.values(msg)/*msg*/);
-		//console.log('Mensaje: '+ Object.values(msg));
 		//io.to(msg.usuario).emit('cambia pagina',msg);
 		//io.emit('virtualPresentations', msg);
 		if (msg.fijar) {

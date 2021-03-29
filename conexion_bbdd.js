@@ -23,7 +23,7 @@ con.connect(function (err) {
     if (err) {
         console.error("Error en la conexión a la Base de datos")
         throw err;
-    }else { console.log("Conectado a la base de datos"); }
+    } else { console.log("Conectado a la base de datos"); }
 
 });
 
@@ -34,15 +34,18 @@ con.connect(function (err) {
  * @param {*} nombre 
  * @param {*} apellidos 
  */
-function adduser(usuario, password, nombre, apellidos) {
-
-    var sql = 'INSERT INTO usuarios (nombreusuario, password, nombre, apellidos) '
-        + `VALUES ('${usuario}','${password}','${nombre}','${apellidos}');`;
-    //console.log(sql);
-    //añadir a la base de datos
-    con.query(sql, function (err, result) {
-        if (err) throw err;
-        console.log("Se ha añadido el usuario, ID: " + result.insertId);
+function registraUsuario(usuario) {
+    return new Promise(function (resolve, reject) {
+        var sql = `INSERT INTO usuarios (nombreusuario,password,nombre,apellidos,email)`
+            + ` VALUES ('${usuario.nombreusuario}','${usuario.password}','${usuario.nombre}','${usuario.apellidos}','${usuario.email}');`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else {
+                var id = result.insertId;
+                resolve('OK');
+            }
+        });
     });
 }
 
@@ -57,7 +60,7 @@ function buscausuario(usuario) {
         con.query(sql, function (err, result, fields) {
             if (err) {
                 reject(err);
-            } else if (result == ''){
+            } else if (result == '') {
                 reject('No se encuentra el usuario!');
             } else {
                 var usuario = {
@@ -79,46 +82,77 @@ function buscausuario(usuario) {
  * @param {Number} id 
  * @param {String} usuario 
  */
-function compruebaUsuario(id, usuario){
+function compruebaToken(id, token) { 
     return new Promise(function (resolve, reject) {
-        var sql = `SELECT * FROM usuarios WHERE idusuario=${id} AND nombreusuario='${usuario}';`;
+        var sql = `SELECT * FROM usuarios WHERE idusuario=${id} AND token='${token}';`;
         con.query(sql, function (err, result, fields) {
             if (err) {
                 reject(err);
-            } else if (result == ''){
-                reject('No se encuentra el usuario!');
+            } else if (result == '') {
+                reject('Token inválido');
             } else {
                 resolve('OK');
             }
         });
     });
 }
+
+/**
+ * Actualiza el token registrado
+ * @param {Number} id 
+ * @param {String} token token encriptado
+ */
+function actualizaToken(id, token) {
+    return new Promise(function (resolve, reject) {
+        var sql = `UPDATE usuarios SET token ='${token}'
+        WHERE idusuario=${id};`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve('OK'); //TODO revisar y probar
+            }
+        });
+    });
+}
+/**
+ * Elimina el token registrado
+ * @param {Number} id 
+ * @param {String} token token encriptado
+ */
+function eliminaToken(id, token) {
+    return new Promise(function (resolve, reject) {
+        var sql = `UPDATE usuarios SET token =''
+        WHERE idusuario=${id} AND token = ${token};`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve('OK'); //TODO revisar y probar
+            }
+        });
+    });
+}
+
 /**
  * Comprueba si el id y usuario es correcto y posteriormente si está registrada la presentación
  * Si no existe la presentación se resolverá con OK
  * En caso contrario 'reject' indicando que ya existe 
- * @param {number} id 
  * @param {String} usuario 
  * @param {String} presentacion 
  */
-function compruebaUsuarioyPresentacion(id, usuario, presentacion){
+function compruebaPresentacion(usuario, presentacion) {
     return new Promise(function (resolve, reject) {
-        compruebaUsuario(id, usuario).then(resp=>{
-            if(resp == 'OK'){
-                var sql = `SELECT idpresentacion, presentacion, paginas, nombreusuario AS autor `
-                +` FROM presentaciones WHERE nombreusuario='${usuario}' AND presentacion='${presentacion}';`;
-                con.query(sql, function (err, result, fields) {
-                    if (err) {
-                        reject(err);
-                    } else if (result == '') {
-                        resolve('OK');
-                    } else {
-                        reject('La presentación ya existe');
-                    }
-                });
+        var sql = `SELECT idpresentacion `
+            + ` FROM presentaciones WHERE nombreusuario='${usuario}' AND presentacion='${presentacion}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else if (result == '') {
+                resolve('OK');
+            } else {
+                reject('La presentación ya existe');
             }
-        }).catch(e=>{
-            reject(e);
         });
     });
 }
@@ -127,13 +161,13 @@ function compruebaUsuarioyPresentacion(id, usuario, presentacion){
  * Busca las presentaciones disponibles en el servidor a partir del usuario
  * @param {String} usuario 
  */
-function buscaPresentaciones(usuario){
+function buscaPresentaciones(usuario) {
     return new Promise(function (resolve, reject) {
         var sql = `SELECT * FROM presentaciones WHERE nombreusuario='${usuario}';`;
         con.query(sql, function (err, result, fields) {
             if (err) {
                 reject(err);
-            } else if (result == ''){
+            } else if (result == '') {
                 reject('No se encuentra el usuario!');
             } else {
                 resolve(result);
@@ -148,14 +182,14 @@ function buscaPresentaciones(usuario){
  * @param {*} paginas número de páginas
  * @param {String} usuario nombre de usuario
  */
-function creaPresentacion (presentacion, paginas, usuario){
+function creaPresentacion(presentacion, paginas, usuario) {
     return new Promise(function (resolve, reject) {
         var sql = `INSERT INTO presentaciones (presentacion,paginas,nombreusuario)`
-        +` VALUES ('${presentacion}','${paginas}','${usuario}');`;
+            + ` VALUES ('${presentacion}','${paginas}','${usuario}');`;
         con.query(sql, function (err, result, fields) {
             if (err) {
-                console.log('pres bbdd:',err);
-                reject('ERROR',err);
+                console.log('pres bbdd:', err);
+                reject('ERROR', err);
             } else {
                 resolve('OK');
             }
@@ -167,10 +201,10 @@ function creaPresentacion (presentacion, paginas, usuario){
  * @param {String} presentacion nombre completo de la presentación
  * @param {String} usuario nombre de usuario
  */
-function borraPresentacion (presentacion, usuario){
+function borraPresentacion(presentacion, usuario) {
     return new Promise(function (resolve, reject) {
         var sql = `DELETE FROM presentaciones WHERE`
-            +` presentacion='${presentacion}' and nombreusuario='${usuario}';`;
+            + ` presentacion='${presentacion}' and nombreusuario='${usuario}';`;
         con.query(sql, function (err, result, fields) {
             if (err) {
                 reject(err);
@@ -183,10 +217,12 @@ function borraPresentacion (presentacion, usuario){
 
 //Declaración de las funciones
 module.exports = {
+    registraUsuario: registraUsuario,
     buscausuario: buscausuario,
+    compruebaToken: compruebaToken,
+    actualizaToken: actualizaToken,
     buscaPresentaciones: buscaPresentaciones,
     creaPresentacion: creaPresentacion,
     borraPresentacion: borraPresentacion,
-    compruebaUsuario: compruebaUsuario,
-    compruebaUsuarioyPresentacion: compruebaUsuarioyPresentacion
+    compruebaPresentacion: compruebaPresentacion
 };
