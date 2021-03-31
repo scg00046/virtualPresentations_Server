@@ -40,9 +40,6 @@ const urlcreaSesion = rutadef + '/session/:usuario';
  * /virtualpresentation/:usuario/:nombresesion */
 const urlpresentacion = urlUsuario + '/:nombresesion';
 
-//Almacenamiento de las sesiones creadas
-let sesiones = [];
-
 //
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -261,11 +258,7 @@ app.delete(urlUsuario, midd.autenticacion, function (request, response) {
 			var notasPresentacion = presentacion.split('.')[0] + '.json';
 			var listaNotas = path.join(__dirname, 'private', usuario, notasPresentacion);
 			fs.unlinkSync(listaNotas);
-			var pos = buscaSesionPresentacion(usuario, presentacion);
-			if (pos != -1) {
-				sesiones.splice(pos, 1); //Elimina la sesión para dicha presentación
-			}
-			mysql.borraPresentacion(presentacion, usuario).then((respuesta) => {
+			mysql.eliminaPresentacion(presentacion, usuario).then((respuesta) => {
 				if (respuesta == 'OK') {
 					response.status(200).send('Eliminado correctamente');
 				}
@@ -286,34 +279,17 @@ app.delete(urlUsuario, midd.autenticacion, function (request, response) {
 /*Petición para crear sesión
 Atributos necesarios: nombresesion; presentacion;
 */
-//sesiones.push(new Sesion('admin', 'nuevaSesion', 'Tema 1 Protocolos de Aplicacion de Internet.pdf') ); //Sesión de prueba
 app.post(urlcreaSesion, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
 	var sesion_req = request.body.session;
 	var presentacion = request.body.presentation;
 	//console.log('usuario: ' + usuario + ', sesion: ' + sesion_req + ', presentacion: ' + presentacion);
 	if (usuario == request.usuario && sesion_req && presentacion) {
-		if (buscaSesion(usuario, sesion_req) != -1) {
-			sesiones.forEach(function (s, i) {
-				if (s.nombreusuario == usuario && s.presentacion == presentacion && s.nombresesion == sesion_req) {
-					console.log('La sesión ya existe');
-					return response.status(400).send('La sesión ya existe');
-				} else if (s.nombreusuario == usuario && s.presentacion != presentacion && s.nombresesion == sesion_req) {
-					console.log('Actualiza la sesión');
-					//Elimina sesión y la crea de nuevo con la presentación actualizada
-					sesiones.splice(i, 1);
-					var sesion = new Sesion(usuario, sesion_req, presentacion);
-					sesiones.push(sesion);
-					//301: Movido permanentemente //TODO revisar
-					return response.status(301).send('Se ha actualizado la sesión');
-				}
-			});
-		} else {
-			var sesion = new Sesion(usuario, sesion_req, presentacion);
-			sesiones.push(sesion);
-			console.log("Se ha creado la sesión");
-			response.status(200).send('Sesión creada');
-		}
+		mysql.registraSesion(sesion_req, presentacion, usuario).then(s=>{
+			response.status(200).send(s);
+		}).catch(e=>{
+			response.status(500).send(e);
+		});
 	} else {
 		//406: no aceptable //TODO revisar códigos de respuesta
 		response.status(406).send('No se han recibido datos');
@@ -328,15 +304,11 @@ app.delete(urlcreaSesion, midd.autenticacion, function (request, response) {
 	console.log("Delete Session, usuario " + usuario + " sesion: " + sesion);
 	if (usuario == request.usuario && sesion) {
 
-		var pos = buscaSesion(usuario, sesion);
-		if (pos != -1) {
-			sesiones.splice(pos, 1);
-			response.status(200).send('Sesión borrada');
-		} else {
-			//409: conflict
-			response.status(409).send('La sesión no existe');
-		}
-
+		mysql.eliminaSesion(sesion, usuario).then(resp=>{
+			response.status(200).send('Sesión eliminada correctamente');
+		}).catch(e=>{
+			response.status(500).send(e);
+		});
 	} else {
 		//406: no aceptable //TODO revisar códigos de respuesta
 		response.status(406).send('No se han recibido los parámetros necesarios');
@@ -348,28 +320,25 @@ app.delete(urlcreaSesion, midd.autenticacion, function (request, response) {
 app.get(urlpresentacion, function (request, response) {
 	var usuario = request.params.usuario;
 	var nombresesion = request.params.nombresesion;
-	var index = buscaSesion(usuario, nombresesion);
 
 	var rand = random.generate({
 		length: 5,
 		charset: 'alphanumeric'
 	});
-	if (index != -1) {
-		var sesion = sesiones[index];
+	mysql.buscaSesionUsuario(usuario, nombresesion).then(sesion=>{
 		sesion.codigo = rand;
 		var jsonSesion = JSON.stringify(sesion);
-		var sesionCodigo = sesion.nombresesion + '_' + rand;
+		var sesionCodigo = sesion.sesion + '_' + rand;
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
-			//console.log(url);
 			var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
-			var rutaNotas = path.join(__dirname, 'private', sesion.nombreusuario, notasPresentacion);
+			var rutaNotas = path.join(__dirname, 'private', sesion.usuario, notasPresentacion);
 			var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
 			response.status(200).render(path.join(__dirname, 'public', 'presentation.ejs'),
 				{ 'sesion': sesion, 'qr': url, 'listaNotas': listaNotas, 'sesionCodigo': sesionCodigo });
 		});
-	} else {
+	}).catch(e=>{
 		response.status(500).render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
-	}
+	});
 });
 
 http.listen(puerto, () => {
@@ -392,20 +361,17 @@ io.on('connection', (socket) => {
 			console.log('nota a fijar');
 			//var usuario = msg.usuario.split('-')[0]; //usuario sin '-nota'
 			var s = msg.sesion.split('_')[0]; //Sesión sin el código
-			var index = buscaSesion(msg.usuario, s);
-			if (index != -1) {
-				var s = sesiones[index];
-				//console.log(sesiones[index].presentacion);
-				var notasPresentacion = s.presentacion.split('.')[0] + '.json';
-				var rutaNotas = path.join(__dirname, 'private', s.nombreusuario, notasPresentacion);
+			mysql.buscaSesionUsuario(msg.usuario, s).then(sesion=>{
+				var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
+				var rutaNotas = path.join(__dirname, 'private', sesion.usuario, notasPresentacion);
 				var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
-				nota = {
+				let nota = {
 					fecha: getFecha(),
 					nota: msg.nota
 				}
 				listaNotas.push(nota);
 				fs.writeFileSync(rutaNotas, JSON.stringify(listaNotas, null, 1));
-			}
+			}).catch(e=>{console.error(e)});
 
 		}
 		io.emit(nombresesion, msg);
@@ -422,40 +388,3 @@ function getFecha() {
 	return hoy.getDate() + '/' + (hoy.getMonth() + 1) + '/' + hoy.getFullYear();
 }
 
-
-/* Sesión */
-function Sesion(usuario, sesion, presentacion) {
-	this.nombreusuario = usuario;
-	this.nombresesion = sesion;
-	this.presentacion = presentacion;
-}
-
-/**
- * Busca las sesiones creadas para el usuario y nombre de sesión específicos
- * Devuelve el índice de la sesión, si la sesión no existe devuelve -1
- * @param {String} usuario 
- * @param {String} sesion 
- */
-function buscaSesion(usuario, sesion) {
-	var index = -1;
-	sesiones.forEach(function (s, i) {
-		//console.log(i + ' - ' + s.nombresesion);
-		if (s.nombreusuario == usuario && s.nombresesion == sesion) {
-			//console.log('Coincide usuario y sesion');
-			index = i;
-		}
-	});
-	return index;
-}
-
-function buscaSesionPresentacion(usuario, presentacion) {
-	var index = -1;
-	sesiones.forEach(function (s, i) {
-		//console.log(i + ' - ' + s.nombresesion);
-		if (s.nombreusuario == usuario && s.presentacion == presentacion) {
-			//console.log('Coincide usuario y sesion');
-			index = i;
-		}
-	});
-	return index;
-}

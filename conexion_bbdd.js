@@ -201,7 +201,7 @@ function creaPresentacion(presentacion, paginas, usuario) {
  * @param {String} presentacion nombre completo de la presentación
  * @param {String} usuario nombre de usuario
  */
-function borraPresentacion(presentacion, usuario) {
+function eliminaPresentacion(presentacion, usuario) {
     return new Promise(function (resolve, reject) {
         var sql = `DELETE FROM presentaciones WHERE`
             + ` presentacion='${presentacion}' and nombreusuario='${usuario}';`;
@@ -215,6 +215,74 @@ function borraPresentacion(presentacion, usuario) {
     });
 }
 
+/**
+ * Crear una nueva sesión, si ya existe actualiza la presentación
+ * @param {String} sesion nombre de la sesión 
+ * @param {String} presentacion nombre de la presentación
+ * @param {String} usuario nombre de usuario
+ */
+ function registraSesion(sesion, presentacion, usuario) {
+    return new Promise(function (resolve, reject) {
+        var sql = `INSERT INTO sesiones (sesion, presentacion, usuario)`
+            + ` VALUES ('${sesion}','${presentacion}','${usuario}')`
+            + ` ON DUPLICATE KEY UPDATE presentacion = '${presentacion}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else {
+                //resolve('OK');
+                if (result.affectedRows == 1 && result.insertId != 0){ 
+                    resolve('Creada');
+                } else if (result.affectedRows == 1 && result.insertId == 0) {
+                    resolve('Sin cambios');
+                } else if (result.affectedRows == 2) {
+                    resolve('Actualizada');
+                }
+            }
+        });
+    });
+}
+
+/**
+ * Elimina sesión
+ * @param {String} sesion nombre de la sesión 
+ * @param {String} usuario nombre de usuario
+ */
+ function eliminaSesion(sesion, usuario) {
+    return new Promise(function (resolve, reject) {
+        var sql = `DELETE FROM sesiones WHERE`
+            + ` sesion = '${sesion}' AND usuario = '${usuario}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else {
+                console.log('Elimina sesión, result: ', result);
+                resolve('OK');
+            }
+        });
+    });
+}
+
+/**
+ * Busca las presentaciones disponibles en el servidor a partir del usuario
+ * @param {String} usuario
+ * @param {String} sesion
+ */
+ function buscaSesionUsuario(usuario, sesion) {
+    return new Promise(function (resolve, reject) {
+        var sql = `SELECT * FROM sesiones WHERE usuario = '${usuario}' AND sesion = '${sesion}';`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else if (result.length == 0) {
+                reject('La sesión no existe');
+            } else {
+                resolve(result[0]);
+            }
+        });
+    });
+}
+
 //Declaración de las funciones
 module.exports = {
     registraUsuario: registraUsuario,
@@ -223,6 +291,9 @@ module.exports = {
     actualizaToken: actualizaToken,
     buscaPresentaciones: buscaPresentaciones,
     creaPresentacion: creaPresentacion,
-    borraPresentacion: borraPresentacion,
-    compruebaPresentacion: compruebaPresentacion
+    eliminaPresentacion: eliminaPresentacion,
+    compruebaPresentacion: compruebaPresentacion,
+    registraSesion: registraSesion,
+    eliminaSesion: eliminaSesion,
+    buscaSesionUsuario: buscaSesionUsuario
 };

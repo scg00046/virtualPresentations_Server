@@ -80,7 +80,6 @@ function render() {
         container.innerHTML = '';
         // Document loaded, retrieving the page.
         return pdfDocument.getPage(PAGE_TO_VIEW).then(function (pdfPage) {
-            console.log('render: ' + PAGE_TO_VIEW);
             // Creating the page view with default parameters.
             var pdfPageView = new pdfjsViewer.PDFPageView({
                 container: container,
@@ -130,7 +129,6 @@ function getScroll() {
  */
 function cambiapagina(pagina) {
     if (pdfDoc == null || pagina > pdfDoc.numPages || pagina < 1) {
-        console.error("Petición de página inválida!");
         enviar("Error: Página inválida!");
         //return;
     } else {
@@ -278,7 +276,7 @@ socket.on(sesion, function (msg) {
                     setTimeout(() => {
                         var url = location.href;
                         window.location.replace(url);
-                    }, 800);
+                    }, 1500);
                     break;
                 default:
                     enviar("Comando no reconocido");
@@ -286,7 +284,6 @@ socket.on(sesion, function (msg) {
             }
             peticAnterior = peticNueva;
         } else if (msg.nota && diferencia >= TIEMPO_PETICIONES) {
-            console.log('nota');
             if (msg.fijar) { //TODO revisar nombres
                 notafija(msg.nota); //------------------------------------------------------------------
             } else {

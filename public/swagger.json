@@ -330,7 +330,7 @@
           {
             "in": "body",
             "name": "Sesión",
-            "description": "Datos de autenticación",
+            "description": "Datos de la sesión",
             "required": true,
             "schema": {
               "$ref": "#/definitions/Sesion"
@@ -344,14 +344,8 @@
               "type": "string"
             }
           },
-          "301": {
-            "description": "Sesión actualizada. Actualiza la sesión con la presentación definida",
-            "schema": {
-              "type": "string"
-            }
-          },
-          "400": {
-            "description": "La sesión ya existe",
+          "401": {
+            "description": "Autenticación errónea",
             "schema": {
               "type": "string"
             }
@@ -374,7 +368,7 @@
           }
         ],
         "summary": "Elimina sesión",
-        "description": "Permite autenticarse en la aplicación y obtener los datos del usuario",
+        "description": "Elimina la sesión registrada a partir del usuario y el nombre de la sesión",
         "consumes": [
           "application/json"
         ],
@@ -408,12 +402,6 @@
           },
           "406": {
             "$ref": "#/responses/datos_insuficientes"
-          },
-          "409": {
-            "description": "La sesión no existe",
-            "schema": {
-              "type": "string"
-            }
           },
           "500": {
             "$ref": "#/responses/500"
