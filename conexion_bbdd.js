@@ -43,7 +43,7 @@ function registraUsuario(usuario) {
                 reject(err);
             } else {
                 var id = result.insertId;
-                resolve('OK');
+                resolve('Registrado correctamente');
             }
         });
     });
@@ -110,7 +110,7 @@ function actualizaToken(id, token) {
             if (err) {
                 reject(err);
             } else {
-                resolve('OK'); //TODO revisar y probar
+                resolve('Autenticación correcta'); 
             }
         });
     });
@@ -122,13 +122,13 @@ function actualizaToken(id, token) {
  */
 function eliminaToken(id, token) {
     return new Promise(function (resolve, reject) {
-        var sql = `UPDATE usuarios SET token =''
-        WHERE idusuario=${id} AND token = ${token};`;
+        var sql = `UPDATE usuarios SET token = NULL
+        WHERE idusuario=${id} AND token = '${token}';`;
         con.query(sql, function (err, result, fields) {
             if (err) {
                 reject(err);
             } else {
-                resolve('OK'); //TODO revisar y probar
+                resolve('Sesión cerrada');
             }
         });
     });
@@ -168,7 +168,7 @@ function buscaPresentaciones(usuario) {
             if (err) {
                 reject(err);
             } else if (result == '') {
-                reject('No se encuentra el usuario!');
+                reject('Lista vacía');
             } else {
                 resolve(result);
             }
@@ -188,7 +188,6 @@ function creaPresentacion(presentacion, paginas, usuario) {
             + ` VALUES ('${presentacion}','${paginas}','${usuario}');`;
         con.query(sql, function (err, result, fields) {
             if (err) {
-                console.log('pres bbdd:', err);
                 reject('ERROR', err);
             } else {
                 resolve('OK');
@@ -256,7 +255,6 @@ function eliminaPresentacion(presentacion, usuario) {
             if (err) {
                 reject(err);
             } else {
-                console.log('Elimina sesión, result: ', result);
                 resolve('OK');
             }
         });
@@ -289,6 +287,7 @@ module.exports = {
     buscausuario: buscausuario,
     compruebaToken: compruebaToken,
     actualizaToken: actualizaToken,
+    eliminaToken: eliminaToken,
     buscaPresentaciones: buscaPresentaciones,
     creaPresentacion: creaPresentacion,
     eliminaPresentacion: eliminaPresentacion,

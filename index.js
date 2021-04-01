@@ -82,7 +82,7 @@ app.put(urlLogin, function (request, response) {
 
 	if (usuario) {
 		mysql.buscausuario(usuario.nombreusuario).then((usuario) => {
-			response.status(401).send("El usuario ya existe");
+			response.status(409).send("El usuario ya existe");
 		}).catch((error) => {
 			if (error == 'No se encuentra el usuario!') {
 				mysql.registraUsuario(usuario).then(function (resp) {
@@ -95,7 +95,7 @@ app.put(urlLogin, function (request, response) {
 			}
 		});
 	} else {
-		response.status(406).send('No se han recibido datos');
+		response.status(400).send('No se han recibido datos');
 	}
 
 });
@@ -107,7 +107,7 @@ app.post(urlLogin, function (request, response) {
 	if (username && password) {
 
 		mysql.buscausuario(username).then((usuario) => {
-			//console.log('El usuario buscado es: ' + usuario.nombreusuario);
+
 			if (username == usuario.nombreusuario && password == usuario.password) {
 				var user = {
 					fecha: new Date(),
@@ -139,6 +139,15 @@ app.post(urlLogin, function (request, response) {
 	}
 });
 
+/* Cierre de sesión de usuario */
+app.get(urlLogin, midd.autenticacion, function (request, response) {
+	mysql.eliminaToken(request.idUsuario, request.header('Autenticacion')).then(r=>{
+		response.status(200).send(r);
+	}).catch(e => {
+		response.status(500).send(e);
+	});
+});
+
 /* Petición get a /virtualpresentation/usuario
 	Devuelve las presentaciones almacenadas para seleccionarla 
 	desde la aplicación */
@@ -150,21 +159,22 @@ app.get(urlUsuario, midd.autenticacion, function (request, response) {
 		mysql.buscaPresentaciones(request.usuario).then((listaPresentaciones) => {
 			response.status(200).send(listaPresentaciones);
 		}).catch((error) => {
-			if (error = 'No se encuentra el usuario!') {
-				response.status(401).send("No hay presentaciones para el usuario");
+			if (error == 'Lista vacía') {
+				//response.status(204).send("No hay presentaciones para el usuario");
+				response.status(204).send([]);
 			} else {
 				response.status(500).send(error);
 			}
 		});
 	} else {
-		response.status(500).send('No tiene permiso para ver la lista de presentaciones del usuario');//TODO REVISAR
+		response.status(403).send('Parámetros incorrectos o incompletos');
 	}
 });
 /* Subida de presentación al servidor */
 app.put(urlUsuario, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario;
 	var presentacion = request.files.presentacion;
-	
+
 	if (usuario == request.usuario && presentacion) {
 		if (!request.files || Object.keys(request.files).length === 0) {
 			return response.status(400).send('No se ha subido ningún archivo');
@@ -228,21 +238,16 @@ app.put(urlUsuario, midd.autenticacion, function (request, response) {
 						}
 					});
 				}
-			}).catch((error) => { //El usuario no coincide, la presentación está registrada o se ha producido un error en la base de datos
-				console.log('Error: ' + error);
-				if (error == 'No se encuentra el usuario!') {
-					//403 Forbidden
-					response.status(403).send('El usuario no está registrado');
-				} else if (error == 'La presentación ya existe') {
-					response.status(406).send(error);
+			}).catch((error) => { //La presentación está registrada o se ha producido un error en la base de datos
+				if (error == 'La presentación ya existe') {
+					response.status(409).send(error);
 				} else {
 					response.status(500).send(error);
 				}
 			});
 		}
 	} else {
-		//406: no aceptable //TODO revisar códigos de respuesta
-		response.status(400).send('No se han recibido datos');
+		response.status(403).send('Parámetros incorrectos o incompletos');
 	}
 });
 /* Eliminar presentación almacenada */
@@ -263,7 +268,6 @@ app.delete(urlUsuario, midd.autenticacion, function (request, response) {
 					response.status(200).send('Eliminado correctamente');
 				}
 			}).catch((e) => {
-				//503: Service unavailable
 				response.status(500).send('Error en la base de datos: ' + e);
 			});
 		} catch (err) {
@@ -271,8 +275,7 @@ app.delete(urlUsuario, midd.autenticacion, function (request, response) {
 		}
 
 	} else {
-		//406: no aceptable //TODO revisar códigos de respuesta
-		response.status(406).send('No se han recibido los parámetros necesarios');
+		response.status(403).send('Parámetros incorrectos o incompletos');
 	}
 });
 
@@ -283,16 +286,15 @@ app.post(urlcreaSesion, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
 	var sesion_req = request.body.session;
 	var presentacion = request.body.presentation;
-	//console.log('usuario: ' + usuario + ', sesion: ' + sesion_req + ', presentacion: ' + presentacion);
+
 	if (usuario == request.usuario && sesion_req && presentacion) {
-		mysql.registraSesion(sesion_req, presentacion, usuario).then(s=>{
+		mysql.registraSesion(sesion_req, presentacion, usuario).then(s => {
 			response.status(200).send(s);
-		}).catch(e=>{
+		}).catch(e => {
 			response.status(500).send(e);
 		});
 	} else {
-		//406: no aceptable //TODO revisar códigos de respuesta
-		response.status(406).send('No se han recibido datos');
+		response.status(403).send('Parámetros incorrectos o incompletos');
 	}
 });
 
@@ -300,18 +302,16 @@ app.post(urlcreaSesion, midd.autenticacion, function (request, response) {
 app.delete(urlcreaSesion, midd.autenticacion, function (request, response) {
 	var usuario = request.params.usuario;
 	var sesion = request.headers.session;
-	
-	console.log("Delete Session, usuario " + usuario + " sesion: " + sesion);
+
 	if (usuario == request.usuario && sesion) {
 
-		mysql.eliminaSesion(sesion, usuario).then(resp=>{
+		mysql.eliminaSesion(sesion, usuario).then(resp => {
 			response.status(200).send('Sesión eliminada correctamente');
-		}).catch(e=>{
+		}).catch(e => {
 			response.status(500).send(e);
 		});
 	} else {
-		//406: no aceptable //TODO revisar códigos de respuesta
-		response.status(406).send('No se han recibido los parámetros necesarios');
+		response.status(403).send('Parámetros incorrectos o incompletos');
 	}
 });
 
@@ -325,7 +325,7 @@ app.get(urlpresentacion, function (request, response) {
 		length: 5,
 		charset: 'alphanumeric'
 	});
-	mysql.buscaSesionUsuario(usuario, nombresesion).then(sesion=>{
+	mysql.buscaSesionUsuario(usuario, nombresesion).then(sesion => {
 		sesion.codigo = rand;
 		var jsonSesion = JSON.stringify(sesion);
 		var sesionCodigo = sesion.sesion + '_' + rand;
@@ -336,8 +336,12 @@ app.get(urlpresentacion, function (request, response) {
 			response.status(200).render(path.join(__dirname, 'public', 'presentation.ejs'),
 				{ 'sesion': sesion, 'qr': url, 'listaNotas': listaNotas, 'sesionCodigo': sesionCodigo });
 		});
-	}).catch(e=>{
-		response.status(500).render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
+	}).catch(e => {
+		if (e == 'La sesión no existe') {
+			response.status(400).render(path.join(__dirname, 'public', 'errorsession.ejs'), { 'usuario': usuario, 'sesion': nombresesion });
+		} else {
+			response.status(500).send(e);
+		}
 	});
 });
 
@@ -361,7 +365,7 @@ io.on('connection', (socket) => {
 			console.log('nota a fijar');
 			//var usuario = msg.usuario.split('-')[0]; //usuario sin '-nota'
 			var s = msg.sesion.split('_')[0]; //Sesión sin el código
-			mysql.buscaSesionUsuario(msg.usuario, s).then(sesion=>{
+			mysql.buscaSesionUsuario(msg.usuario, s).then(sesion => {
 				var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
 				var rutaNotas = path.join(__dirname, 'private', sesion.usuario, notasPresentacion);
 				var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
@@ -371,7 +375,7 @@ io.on('connection', (socket) => {
 				}
 				listaNotas.push(nota);
 				fs.writeFileSync(rutaNotas, JSON.stringify(listaNotas, null, 1));
-			}).catch(e=>{console.error(e)});
+			}).catch(e => { console.error(e) });
 
 		}
 		io.emit(nombresesion, msg);

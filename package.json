@@ -1,6 +1,6 @@
 {
   "name": "virtualpresentations",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Servicio de presentación virtual controlado desde terminal móvil. Servidor",
   "main": "index.js",
   "scripts": {

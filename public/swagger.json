@@ -1,8 +1,8 @@
 {
   "swagger": "2.0",
   "info": {
-    "description": "This is a sample server Petstore server.  You can find out more about     Swagger at [http://swagger.io](http://swagger.io) or on [irc.freenode.net, #swagger](http://swagger.io/irc/).      For this sample, you can use the api key `special-key` to test the authorization     filters.",
-    "version": "1.0.0",
+    "description": "API REST servidor del Trabajo de Fin de Grado `Presentación virtual controlado desde termina móvil`, de la titulación [Grado en Ingeniería Telemática - EPSL](https://www.ujaen.es/estudios/oferta-academica/grados/grado-en-ingenieria-telematica-eps-linares)<br><br><i>Realizado por:</i> <b>Sergio Caballero Garrido</b> con la ayuda del tutor <b>Juan Carlos Cuevas Martínez</b>.",
+    "version": "1.1.0",
     "title": "TFG: Presentacion virtual",
     "contact": {
       "name": "Sergio Caballero Garrido",
@@ -10,30 +10,30 @@
     }
   },
   "externalDocs": {
-    "description": "Find out more about Swagger",
-    "url": "http://swagger.io"
+    "description": "Escuela Politécnica Superior de Linares, Universidad de Jaén",
+    "url": "https://epsl.ujaen.es/"
   },
   "host": "localhost:8080",
   "basePath": "/virtualpresentation",
   "tags": [
     {
       "name": "Usuario",
-      "description": "Datos del usuario, login, etc"
+      "description": "Datos del usuario y acceso"
     },
     {
       "name": "Presentaciones",
-      "description": "Acceso y listado de presentaciones"
+      "description": "Listado de presentaciones, subida y eliminación"
     },
     {
       "name": "Sesiones",
-      "description": "Permite crear y eliminar sesiones"
+      "description": "Crear y eliminar sesiones"
     },
     {
       "name": "Portal",
       "description": "Portal de presentación",
       "externalDocs": {
-        "description": "Find out more about our store",
-        "url": "http://swagger.io"
+        "description": "Enlace de ejemplo",
+        "url": "http://localhost:8080/virtualpresentation/user/session"
       }
     }
   ],
@@ -73,16 +73,10 @@
             }
           },
           "400": {
-            "description": "No se han recibido datos de usuario",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/400"
           },
           "401": {
-            "description": "Usuario o contraseña incorrecto",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/401"
           },
           "500": {
             "$ref": "#/responses/500"
@@ -108,7 +102,26 @@
             "description": "Datos de usuario",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/Usuario"
+              "type": "object",
+              "properties": {
+                "nombreusuario": {
+                  "type": "string"
+                },
+                "nombre": {
+                  "type": "string"
+                },
+                "apellidos": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string",
+                  "format": "password"
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                }
+              }
             }
           }
         ],
@@ -116,20 +129,50 @@
           "200": {
             "description": "Registro completo",
             "schema": {
-              "$ref": "#/definitions/Usuario"
+              "type": "string"
             }
           },
           "400": {
-            "description": "No se han recibido datos de usuario",
+            "$ref": "#/responses/400"
+          },
+          "409": {
+            "description": "El usuario ya está registrado",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Usuario"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Cierra sesión de usuario",
+        "description": "Permite cerrar sesión y eliminar el token",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sesión cerrada",
             "schema": {
               "type": "string"
             }
           },
           "401": {
-            "description": "Usuario o contraseña incorrecto",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/401"
           },
           "500": {
             "$ref": "#/responses/500"
@@ -147,7 +190,7 @@
             "token": []
           }
         ],
-        "summary": "Listado de presentaciones",
+        "summary": "Listar presentaciones",
         "description": "Consulta la lista de presentaciones registradas",
         "consumes": [
           "application/json"
@@ -162,7 +205,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Información del usuario",
+            "description": "Listado de presentaciones",
             "schema": {
               "type": "array",
               "items": {
@@ -170,17 +213,18 @@
               }
             }
           },
-          "400": {
-            "description": "No se han recibido datos de usuario",
+          "204": {
+            "description": "No hay presentaciones para el usuario",
             "schema": {
-              "type": "string"
+              "type": "array",
+              "items": {}
             }
           },
           "401": {
-            "description": "Usuario o contraseña incorrecto",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/401"
+          },
+          "403": {
+            "$ref": "#/responses/403"
           },
           "500": {
             "$ref": "#/responses/500"
@@ -211,8 +255,9 @@
           {
             "in": "formData",
             "name": "presentacion",
-            "description": "Presentacion a almacenar",
-            "type": "file"
+            "description": "Presentacion a almacenar en formato PDF",
+            "type": "file",
+            "x-mimetype": "application/pdf"
           }
         ],
         "responses": {
@@ -223,18 +268,15 @@
             }
           },
           "400": {
-            "description": "No se han recibido datos de usuario",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/400"
+          },
+          "401": {
+            "$ref": "#/responses/401"
           },
           "403": {
-            "description": "Usuario no registrado",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/403"
           },
-          "406": {
+          "409": {
             "description": "La presentación ya existe",
             "schema": {
               "type": "string"
@@ -268,7 +310,7 @@
           },
           {
             "in": "header",
-            "name": "presentación",
+            "name": "presentacion",
             "required": true,
             "description": "Nombre de la presentación a eliminar",
             "type": "string"
@@ -281,23 +323,11 @@
               "type": "string"
             }
           },
-          "400": {
-            "description": "No se han recibido datos de usuario",
-            "schema": {
-              "type": "string"
-            }
+          "401": {
+            "$ref": "#/responses/401"
           },
           "403": {
-            "description": "Usuario no registrado",
-            "schema": {
-              "type": "string"
-            }
-          },
-          "406": {
-            "description": "La presentación ya existe",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/403"
           },
           "500": {
             "$ref": "#/responses/500"
@@ -345,13 +375,10 @@
             }
           },
           "401": {
-            "description": "Autenticación errónea",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/responses/401"
           },
-          "406": {
-            "$ref": "#/responses/datos_insuficientes"
+          "403": {
+            "$ref": "#/responses/403"
           },
           "500": {
             "$ref": "#/responses/500"
@@ -394,14 +421,11 @@
               "type": "string"
             }
           },
-          "403": {
-            "description": "El usuario no es correcto",
-            "schema": {
-              "type": "string"
-            }
+          "401": {
+            "$ref": "#/responses/401"
           },
-          "406": {
-            "$ref": "#/responses/datos_insuficientes"
+          "403": {
+            "$ref": "#/responses/403"
           },
           "500": {
             "$ref": "#/responses/500"
@@ -414,8 +438,8 @@
         "tags": [
           "Portal"
         ],
-        "summary": "Autenticación en la aplicación",
-        "description": "Consulta la lista de presentaciones registradas",
+        "summary": "Portal presentación",
+        "description": "Portal web exposición de presentación por sesiones",
         "consumes": [
           "application/json"
         ],
@@ -434,8 +458,11 @@
           "200": {
             "description": "Portal de presentación"
           },
-          "500": {
+          "400": {
             "description": "Error en la sesión"
+          },
+          "500": {
+            "$ref": "#/responses/500"
           }
         }
       }
@@ -445,8 +472,7 @@
     "token": {
       "type": "apiKey",
       "name": "Autenticacion",
-      "in": "header",
-      "required": true
+      "in": "header"
     }
   },
   "definitions": {
@@ -497,7 +523,7 @@
         }
       }
     },
-    "Sesion":{
+    "Sesion": {
       "type": "object",
       "properties": {
         "session": {
@@ -526,14 +552,26 @@
     }
   },
   "responses": {
-    "500": {
-      "description": "Error en el servidor",
+    "400": {
+      "description": "No se han recibido datos",
       "schema": {
         "type": "string"
       }
     },
-    "datos_insuficientes": {
-      "description": "No se han recibido datos",
+    "401": {
+      "description": "Datos de autenticación incorrectos",
+      "schema": {
+        "type": "string"
+      }
+    },
+    "403": {
+      "description": "Parámetros incorrectos o incompletos",
+      "schema": {
+        "type": "string"
+      }
+    },
+    "500": {
+      "description": "Error en el servidor",
       "schema": {
         "type": "string"
       }
