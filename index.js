@@ -15,7 +15,7 @@ const pdfjsdist = require('pdfjs-dist'); //Lector pdf
 const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
 const qrcode = require('qrcode');
 const http = require('http').createServer(app); //npm i http
-const io = require('socket.io')(http); //npm i socket.io
+const io = require('socket.io')(http, {path: '/virtualpresentation/socket.io'}); //npm i socket.io
 const random = require('randomstring');
 const swaggerUi = require('swagger-ui-express');
 const jwt = require('jwt-simple');
@@ -221,7 +221,6 @@ app.put(urlUsuario, midd.autenticacion, function (request, response) {
 										response.status(200).send('Presentación almacenada');
 									}
 								}).catch(e => {
-									console.error('error 167', e);
 									if (e.toString().startsWith('ERROR')) {
 										console.error('Error en el registro en la bbdd: ', e);
 										try {
@@ -233,6 +232,7 @@ app.put(urlUsuario, midd.autenticacion, function (request, response) {
 										}
 										return e;
 									}
+									//TODO: return??
 								});
 							});
 						}

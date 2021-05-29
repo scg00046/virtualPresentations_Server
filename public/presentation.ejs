@@ -51,13 +51,11 @@
         <div id="div_pdfviwer" style="display: none;">
             <!-- DIV lista de notas -->
             <div id="div_sidebar" class="sidebar" style="margin-left: 0px;">
-                <div id="nota_top" style="float: inline-start">
+                <div id="nota_top" style="float: inline-start; max-width: 95%;">
                     <ul id="listaNotas"></ul>
                 </div>
-                <div id="notas_button" style="float: inline-end;">
+                <div id="notas_button" style="float: inline-end; max-width: 95%;">
                     <ul id="notasFijas">
-                        <li>Nota 1</li>
-                        <li>-----------</li>
                         <% for (var i = 0; i < listaNotas.length; i++) { %>
                         <li><em style='font-size: 12px;'>[<%=listaNotas[i].fecha%>] </em>
                             <%=listaNotas[i].nota%></li>
@@ -83,7 +81,7 @@
             Autor: Sergio Caballero Garrido &emsp; Tutor: Juan Carlos Cuevas Martínez</span>
     </footer>
     <!-- SocketIO-->
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="/virtualpresentation/socket.io/socket.io.js"></script>
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <!--Controlador del visor-->
     <script src="/public/pdfViwer.js" type="text/javascript"></script>

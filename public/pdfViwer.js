@@ -15,7 +15,7 @@
 "use strict";
 
 /** Variables */
-var socket = io();
+var socket = io({path:'/virtualpresentation/socket.io'});
 //Variables pdf y html
 var header = document.getElementsByTagName("header");
 var container = document.getElementById("div_container");
@@ -133,7 +133,7 @@ function cambiapagina(pagina) {
         //return;
     } else {
         PAGE_TO_VIEW = pagina;
-        enviar("Página: " + PAGE_TO_VIEW);
+        enviar("Página:" + PAGE_TO_VIEW);
         render();
     }
 }
@@ -219,7 +219,7 @@ socket.on(sesion, function (msg) {
                     divpdf.style.display = "block"; // block: mostrar
                     divqr.style.display = "none"; //none: ocultar;
                     header[0].style.display = "none";
-                    enviar("Página: " + PAGE_TO_VIEW);
+                    enviar("Página inicial:" + PAGE_TO_VIEW);
                     break;
                 case "pmas":
                     pagina = PAGE_TO_VIEW + 1;
@@ -276,7 +276,7 @@ socket.on(sesion, function (msg) {
                     setTimeout(() => {
                         var url = location.href;
                         window.location.replace(url);
-                    }, 1500);
+                    }, 500);
                     break;
                 default:
                     enviar("Comando no reconocido");
@@ -309,11 +309,11 @@ function enviar(texto) {
 }
 
 //pregunta si desea salir
-window.addEventListener("beforeunload", function (e) {
+/*window.addEventListener("beforeunload", function (e) {
     var confirmationMessage = "\o/";
     e.returnValue = confirmationMessage;     // Gecko, Trident, Chrome 34+
     return confirmationMessage;              // Gecko, WebKit, Chrome <34
-});
+});*/
 
 //al cerrar/recargar la página
 window.onunload = function () {
