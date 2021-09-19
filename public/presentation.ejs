@@ -57,8 +57,12 @@
                 <div id="notas_button" style="float: inline-end; max-width: 95%;">
                     <ul id="notasFijas">
                         <% for (var i = 0; i < listaNotas.length; i++) { %>
-                        <li><em style='font-size: 12px;'>[<%=listaNotas[i].fecha%>] </em>
-                            <%=listaNotas[i].nota%></li>
+                        <li id=<%=listaNotas[i].id%>><em style='font-size: 12px;'>[<%=listaNotas[i].fecha%>]
+                            [<a class="pagina" onclick="cambiapagina(<%=listaNotas[i].pagina%>)">P.<%=listaNotas[i].pagina%></a>]
+                        </em>
+                            <%-listaNotas[i].nota%>
+                            <a class="elimina" onclick="eliminaNotaFija(<%=`'${listaNotas[i].id}'`%>)">X</a>
+                        </li>
                         <% } %>
                     </ul>
                 </div>

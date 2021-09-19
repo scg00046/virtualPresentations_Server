@@ -1,68 +1,58 @@
 const mysql = require('./conexion_bbdd');
 const jwt = require('jwt-simple');
+const moment = require('moment');
 
 const TAG = 'pizarravirtual'
-module.exports.TAG = TAG;
 
-exports.autenticacion = function (request, response, next) {
+function authorization(request, response, next) {
 
     //Validar AUTH
-    if (!request.header('Autenticacion')) {
+    if (!request.header('Authorization')) {
         return response.status(401).send('Es necesario autenticarse en la aplicación, la sesión no es válida');
     }
-    console.log('Método: ', request.method, ' - URL: ', request.originalUrl, ' - Body: ', request.body);
+    //console.log('Método: ', request.method, ' - URL: ', request.originalUrl, ' - Body: ', request.body);
     try {
-        var token = request.header('Autenticacion');
+        var token = request.header('Authorization').split(' ')[1];
         var payload = {};
 
         payload = jwt.decode(token, TAG);
         request.idUsuario = payload.id;
-        request.usuario = payload.nombreusuario;
+        request.usuario = payload.nickname;
 
-        mysql.compruebaToken(payload.id, token).then(()=>{
-            next();
-        }).catch(()=>{
+        mysql.compruebaToken(payload.id, token).then(() => {
+            //Validar expiración del token
+            if (payload.exp <= moment().unix()) {
+                return response.status(419).send('El token ha expirado');
+            } else {
+                next();
+            }
+        }).catch(() => {
             response.status(401).send('El token no es válido');
         })
-
-        /* Validar CADUCIDAD del TOKEN
-        if (payload.exp <= moment().unix()) {
-            return response.status(419).send({ message: i18n.__('AUTHEXP') });
-        }
-
-        //Validar CADUCIDAD del la SESION
-        var query_auth = "UPDATE  \
-          seg_users_sessions_active \
-        SET exp_token=DATE_ADD(fn_now_tz(), INTERVAL ? MINUTE) \
-        WHERE \
-          seg_users_sessions_active.exp_token>fn_now_tz() \
-          AND seg_users_sessions_active.login = ?  \
-          AND seg_users_sessions_active.token = ? LIMIT 1";
-        query_auth = database.mysql.format(query_auth, [config.SESSION_TIME, request.user, request.token]);
-        database.pool.getConnection(function (err, connection) {
-            if (err) {
-                console.error(err);
-                return response.status(500).send({ message: err });
-            } else {
-                connection.query(query_auth, function (err, rows_auth, flds_auth) {
-                    if (err) {
-                        console.error(err);
-                        return response.status(500).send({ message: err });
-                    } else {
-                        if (rows_auth.affectedRows == 1) {
-                            next();
-                        } else {
-                            return response.status(401).send({ message: i18n.__('WRONGSES') });
-                        }
-                    }
-                });
-            }
-            connection.release();
-        });
-*/
     }
     catch (err) {
-        return response.status(401).send('Token inválido');
+        if (err.message == 'Token expired') {
+            return response.status(419).send('El token ha expirado');
+        } else {
+            return response.status(401).send('Token inválido');
+        }
     }
 
+}
+
+function generateToken(user) {
+    var payload = {
+        id: user.id,
+        nickname: user.nombreusuario,
+        name: user.nombre + ' ' + user.apellidos,
+        iat: moment().unix(),
+        exp: moment().add(2, 'days').unix()
+    };
+    var token = jwt.encode(payload, TAG);
+    return token;
+}
+
+module.exports = {
+    authorization: authorization,
+    generateToken: generateToken
 }

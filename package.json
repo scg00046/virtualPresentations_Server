@@ -27,19 +27,22 @@
   },
   "homepage": "https://github.com/scg00046/virtualPresentations_Server#readme",
   "dependencies": {
+    "crypto-js": "^4.1.1",
     "ejs": "^3.1.3",
     "express": "^4.17.1",
     "express-fileupload": "^1.1.10",
     "fs": "0.0.1-security",
     "http": "0.0.1-security",
     "jwt-simple": "^0.5.6",
+    "moment": "^2.29.1",
+    "morgan": "^1.10.0",
     "mysql": "^2.18.1",
     "path": "^0.12.7",
-    "pdf-parse": "^1.1.1",
-    "pdfjs-dist": "^2.4.456",
+    "pdf-page-counter": "^1.0.3",
+    "pdfjs-dist": "^2.9.359",
     "qrcode": "^1.4.4",
-    "randomstring": "^1.1.5",
-    "socket.io": "^2.3.0",
+    "randomstring": "^1.2.1",
+    "socket.io": "^4.1.3",
     "swagger-ui-express": "^4.1.6"
   }
 }

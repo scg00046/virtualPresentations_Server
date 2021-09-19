@@ -62,6 +62,19 @@ header{
     overflow-wrap: break-word;
 }
 
+a.pagina {
+    cursor: pointer;
+    color: #027507FF;
+}
+
+a.elimina {
+    cursor: pointer;
+    color: red;
+}
+a.delete:hover {
+    background-color: yellow;
+}
+
 /* Estilos para los errores*/
 .error{
     text-align: center;

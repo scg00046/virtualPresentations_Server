@@ -10,16 +10,15 @@ const app = express();
 const bodyParser = require('body-parser'); //Recibe los datos enviados en los formularios
 const fileUpload = require('express-fileupload'); //Para subir ficheros
 const fs = require('fs');
-const pdfparse = require('pdf-parse'); //Obtener datos de la presentación
-const pdfjsdist = require('pdfjs-dist'); //Lector pdf
-const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
+const pdfData = require('pdf-page-counter'); //Obtener datos de la presentación
+const pdfjsdist = require('pdfjs-dist'); //Lector pdf, utilizado en la vista
 const qrcode = require('qrcode');
 const http = require('http').createServer(app); //npm i http
-const io = require('socket.io')(http, {path: '/virtualpresentation/socket.io'}); //npm i socket.io
+const io = require('socket.io')(http, { path: '/virtualpresentation/socket.io' }); //npm i socket.io
 const random = require('randomstring');
 const swaggerUi = require('swagger-ui-express');
-const jwt = require('jwt-simple');
 
+const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
 const midd = require('./middleware');
 
 //REST
@@ -40,11 +39,25 @@ const urlcreaSesion = rutadef + '/session/:usuario';
  * /virtualpresentation/:usuario/:nombresesion */
 const urlpresentacion = urlUsuario + '/:nombresesion';
 
-//
+//Configuración datos recibidos
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.set('view engine', 'ejs');
+app.set('case sensitive routing', true); //URL sensibles a mayusculas
+app.set('view engine', 'ejs'); //Motor de vistas
+
+//Cabeceras y métodos
+app.use(function (req, res, next) { //TODO: revisar cabeceras
+	//res.header("Access-Control-Allow-Origin", "*");
+	//res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Language, Version");
+	var methods = 'GET,POST,PUT,DELETE'
+	res.header('Access-Control-Allow-Methods', methods);
+	(methods.split(',').find(m => m == req.method)) ? next() : res.sendStatus(405);
+});
+
+//Desarrollo
+const morgan = require('morgan');
+app.use(morgan('dev'));
 
 //Obtener los recursos necesarios para la página web
 //app.use('/public/css', express.static(__dirname + '/css'));
@@ -58,6 +71,8 @@ const swaggerDocument = require('./public/swagger.json');
 var swaggerOptions = {
 	explorer: true,
 	customCss: '.swagger-ui .topbar { display: none }',
+	customSiteTitle: 'Presentación virtual - Documentación',
+	customfavIcon: '/public/uja.ico',
 	swaggerOptions: {
 		url: `http://localhost:8080/virtualpresentation/swagger.json`
 	}
@@ -110,16 +125,13 @@ app.post(urlLogin, function (request, response) {
 
 			if (username == usuario.nombreusuario && password == usuario.password) {
 				var user = {
-					fecha: new Date(),
 					id: usuario.id,
 					nombreusuario: usuario.nombreusuario,
 					nombre: usuario.nombre,
 					apellidos: usuario.apellidos
 				};
-				var token = jwt.encode(user, midd.TAG);
-				delete user['fecha'];
-				user['token'] = token;
-				mysql.actualizaToken(user.id, token).then(r => {
+				user['token'] = midd.generateToken(user);
+				mysql.actualizaToken(user.id, user.token).then(r => {
 					response.status(200).send(user); //Responde con código 200 y el objeto usuario
 				}).catch(err => {
 					response.status(500).send(err);
@@ -140,8 +152,8 @@ app.post(urlLogin, function (request, response) {
 });
 
 /* Cierre de sesión de usuario */
-app.get(urlLogin, midd.autenticacion, function (request, response) {
-	mysql.eliminaToken(request.idUsuario, request.header('Autenticacion')).then(r=>{
+app.get(urlLogin, midd.authorization, function (request, response) {
+	mysql.eliminaToken(request.idUsuario, request.header('Autenticacion')).then(r => {
 		response.status(200).send(r);
 	}).catch(e => {
 		response.status(500).send(e);
@@ -151,10 +163,10 @@ app.get(urlLogin, midd.autenticacion, function (request, response) {
 /* Petición get a /virtualpresentation/usuario
 	Devuelve las presentaciones almacenadas para seleccionarla 
 	desde la aplicación */
-app.get(urlUsuario, midd.autenticacion, function (request, response) {
+app.get(urlUsuario, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
-	var hora = new Date().getHours() + ':' + new Date().getMinutes();
-	console.log(hora + " Petición de presentaciones: " + usuario);
+	// var hora = new Date().getHours() + ':' + new Date().getMinutes();
+	// console.log(hora + " Petición de presentaciones: " + usuario);
 	if (usuario == request.usuario) {
 		mysql.buscaPresentaciones(request.usuario).then((listaPresentaciones) => {
 			response.status(200).send(listaPresentaciones);
@@ -171,7 +183,7 @@ app.get(urlUsuario, midd.autenticacion, function (request, response) {
 	}
 });
 /* Subida de presentación al servidor */
-app.put(urlUsuario, midd.autenticacion, function (request, response) {
+app.put(urlUsuario, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
 	var presentacion = request.files.presentacion;
 
@@ -204,36 +216,35 @@ app.put(urlUsuario, midd.autenticacion, function (request, response) {
 						} else {
 							console.log('Presentación almacenada');
 							//Obtener el número de páginas y agregarlo a la base de datos
-							pdfparse(fs.readFileSync(directorioPresentacion)).then(function (datos) {
+							pdfData(presentacion).then(function (datos) {
 								var paginas = datos.numpages;
 								console.log('numero de paginas', paginas);
 								mysql.creaPresentacion(presentacion.name, paginas, usuario).then((respuesta) => {
 									if (respuesta == 'OK') {
 										console.log('registro en bbdd');
 										//crear json para notas fijas
-										var notasPresentacion = presentacion.name.split('.')[0] + '.json';
+										var notasPresentacion = presentacion.name.split('.pdf')[0] + '.json';
 										var listaNotas = path.join(directorioUsuario, notasPresentacion);
 										fs.writeFile(listaNotas, '[]', function (err) {
 											if (err) return err;
 											console.log('DONE');
 										});
-
 										response.status(200).send('Presentación almacenada');
 									}
 								}).catch(e => {
-									if (e.toString().startsWith('ERROR')) {
-										console.error('Error en el registro en la bbdd: ', e);
-										try {
-											//Elimina el fichero si no se ha podido registrar
-											fs.unlinkSync(directorioPresentacion);
-										} catch (err) {
-											console.error('Error al Eliminar fichero: ' + err);
-											//response.status(500).send('No se ha podido eliminar');
-										}
-										return e;
-									}
-									//TODO: return??
+									console.error('Error en el registro en la bbdd: ', e);
+									//Elimina el fichero si no se ha podido registrar
+									fs.unlink(directorioPresentacion, (err) => {
+										if (err) console.error('Error al Eliminar fichero: ' + err);
+									});
+									response.status(500).send(e);
 								});
+							}).catch(error => {
+								//Elimina el fichero si no se ha podido registrar
+								fs.unlink(directorioPresentacion, (err) => {
+									if (err) console.error('Error al Eliminar fichero: ' + err);
+								});
+								response.status(500).send(error);
 							});
 						}
 					});
@@ -251,7 +262,7 @@ app.put(urlUsuario, midd.autenticacion, function (request, response) {
 	}
 });
 /* Eliminar presentación almacenada */
-app.delete(urlUsuario, midd.autenticacion, function (request, response) {
+app.delete(urlUsuario, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
 	var presentacion = request.headers.presentacion;
 
@@ -260,7 +271,7 @@ app.delete(urlUsuario, midd.autenticacion, function (request, response) {
 		var directorioPresentacion = path.join(__dirname, 'private', usuario, presentacion);
 		try {
 			fs.unlinkSync(directorioPresentacion);
-			var notasPresentacion = presentacion.split('.')[0] + '.json';
+			var notasPresentacion = presentacion.split('.pdf')[0] + '.json';
 			var listaNotas = path.join(__dirname, 'private', usuario, notasPresentacion);
 			fs.unlinkSync(listaNotas);
 			mysql.eliminaPresentacion(presentacion, usuario).then((respuesta) => {
@@ -279,10 +290,32 @@ app.delete(urlUsuario, midd.autenticacion, function (request, response) {
 	}
 });
 
+/* Petición get a /virtualpresentation/session/usuario
+	Devuelve las sesiones creadas por el usuario */
+app.get(urlcreaSesion, midd.authorization, function (request, response) {
+	var usuario = request.params.usuario;
+	// var hora = new Date().getHours() + ':' + new Date().getMinutes();
+	// console.log(hora + " Petición de presentaciones: " + usuario);
+	if (usuario == request.usuario) {
+		mysql.buscaSesiones(request.usuario).then((listaSesiones) => {
+			response.status(200).send(listaSesiones);
+		}).catch((error) => {
+			if (error == 'Lista vacía') {
+				//response.status(204).send("No hay presentaciones para el usuario");
+				response.status(204).send([]);
+			} else {
+				response.status(500).send(error);
+			}
+		});
+	} else {
+		response.status(403).send('Parámetros incorrectos o incompletos');
+	}
+});
+
 /*Petición para crear sesión
 Atributos necesarios: nombresesion; presentacion;
 */
-app.post(urlcreaSesion, midd.autenticacion, function (request, response) {
+app.post(urlcreaSesion, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
 	var sesion_req = request.body.session;
 	var presentacion = request.body.presentation;
@@ -299,7 +332,7 @@ app.post(urlcreaSesion, midd.autenticacion, function (request, response) {
 });
 
 //Finaliza la sesión
-app.delete(urlcreaSesion, midd.autenticacion, function (request, response) {
+app.delete(urlcreaSesion, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
 	var sesion = request.headers.session;
 
@@ -330,7 +363,7 @@ app.get(urlpresentacion, function (request, response) {
 		var jsonSesion = JSON.stringify(sesion);
 		var sesionCodigo = sesion.sesion + '_' + rand;
 		qrcode.toDataURL(jsonSesion, qrOp, function (err, url) {
-			var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
+			var notasPresentacion = sesion.presentacion.split('.pdf')[0] + '.json';
 			var rutaNotas = path.join(__dirname, 'private', sesion.usuario, notasPresentacion);
 			var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
 			response.status(200).render(path.join(__dirname, 'public', 'presentation.ejs'),
@@ -343,6 +376,10 @@ app.get(urlpresentacion, function (request, response) {
 			response.status(500).send(e);
 		}
 	});
+});
+
+app.all('*', function (request, response) {
+	response.status(404).send(`No se ha encontrado el recurso: http://${request.headers.host}${request.url}`);
 });
 
 http.listen(puerto, () => {
@@ -358,27 +395,40 @@ io.on('connection', (socket) => {
 	//Recepción de mensajes
 	socket.on('virtualPresentations', (msg) => {
 		var nombresesion = msg.sesion;
+		var s = msg.sesion.split('_')[0]; //Sesión sin el código
 		console.log('Mensaje (' + nombresesion + '): ' + Object.values(msg)/*msg*/);
 		//io.to(msg.usuario).emit('cambia pagina',msg);
-		//io.emit('virtualPresentations', msg);
-		if (msg.fijar) {
-			console.log('nota a fijar');
-			//var usuario = msg.usuario.split('-')[0]; //usuario sin '-nota'
-			var s = msg.sesion.split('_')[0]; //Sesión sin el código
+		if (msg.eliminar) {
 			mysql.buscaSesionUsuario(msg.usuario, s).then(sesion => {
-				var notasPresentacion = sesion.presentacion.split('.')[0] + '.json';
+				var notasPresentacion = sesion.presentacion.split('.pdf')[0] + '.json';
 				var rutaNotas = path.join(__dirname, 'private', sesion.usuario, notasPresentacion);
 				var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
-				let nota = {
-					fecha: getFecha(),
-					nota: msg.nota
-				}
-				listaNotas.push(nota);
+				var idx = listaNotas.findIndex(n => n.id == msg.eliminar);
+				(idx > 0) ? listaNotas.splice(idx, 1) : null;
 				fs.writeFileSync(rutaNotas, JSON.stringify(listaNotas, null, 1));
 			}).catch(e => { console.error(e) });
-
+		} else {
+			if (msg.fijar) {
+				console.log('nota a fijar');
+				//var usuario = msg.usuario.split('-')[0]; //usuario sin '-nota'
+				mysql.buscaSesionUsuario(msg.usuario, s).then(sesion => {
+					var notasPresentacion = sesion.presentacion.split('.pdf')[0] + '.json';
+					var rutaNotas = path.join(__dirname, 'private', sesion.usuario, notasPresentacion);
+					var listaNotas = JSON.parse(fs.readFileSync(rutaNotas, 'utf8'));
+					let nota = {
+						id: listaNotas.length + '_' + getFecha() + '_' + msg.pagina,
+						fecha: getFecha(),
+						nota: msg.nota,
+						pagina: msg.pagina
+					}
+					listaNotas.push(nota);
+					fs.writeFileSync(rutaNotas, JSON.stringify(listaNotas, null, 1));
+					io.emit(nombresesion, Object.assign(msg, nota));
+				}).catch(e => { console.error(e) });
+			} else {
+				io.emit(nombresesion, msg);
+			}
 		}
-		io.emit(nombresesion, msg);
 	});
 	//Desconexión de usuario
 	socket.on('disconnect', () => {

@@ -336,6 +336,56 @@
       }
     },
     "/session/{usuario}": {
+      "get": {
+        "tags": [
+          "Sesiones"
+        ],
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Listar sesiones",
+        "description": "Consulta la lista de sesiones creadas",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/parameters/Usuario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listado de sesiones",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Sesion"
+              }
+            }
+          },
+          "204": {
+            "description": "No hay sesiones para el usuario",
+            "schema": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "401": {
+            "$ref": "#/responses/401"
+          },
+          "403": {
+            "$ref": "#/responses/403"
+          },
+          "500": {
+            "$ref": "#/responses/500"
+          }
+        }
+      },
       "post": {
         "tags": [
           "Sesiones"

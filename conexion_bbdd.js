@@ -262,7 +262,7 @@ function eliminaPresentacion(presentacion, usuario) {
 }
 
 /**
- * Busca las presentaciones disponibles en el servidor a partir del usuario
+ * Busca los datos de una sesión dado su nombre y el del usuario
  * @param {String} usuario
  * @param {String} sesion
  */
@@ -281,6 +281,27 @@ function eliminaPresentacion(presentacion, usuario) {
     });
 }
 
+/**
+ * Busca la lista de sesiones del usuario
+ * @param {String} usuario
+ */
+ function buscaSesiones(usuario) {
+    return new Promise(function (resolve, reject) {
+        var sql = `SELECT s.*, p.paginas FROM sesiones s
+            INNER JOIN presentaciones p ON p.presentacion = s.presentacion AND p.nombreusuario = s.usuario
+        WHERE s.usuario ='${usuario}'`;
+        con.query(sql, function (err, result, fields) {
+            if (err) {
+                reject(err);
+            } else if (result.length == 0) {
+                reject('La sesión no existe');
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
 //Declaración de las funciones
 module.exports = {
     registraUsuario: registraUsuario,
@@ -294,5 +315,6 @@ module.exports = {
     compruebaPresentacion: compruebaPresentacion,
     registraSesion: registraSesion,
     eliminaSesion: eliminaSesion,
-    buscaSesionUsuario: buscaSesionUsuario
+    buscaSesionUsuario: buscaSesionUsuario,
+    buscaSesiones: buscaSesiones
 };

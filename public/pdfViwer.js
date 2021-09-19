@@ -29,6 +29,8 @@ var usuario = document.getElementById("usuario").innerHTML;
 var sesion = document.getElementById("nombreSesion").innerHTML;
 var presentacion = document.getElementById("presentacion").innerHTML;
 
+var cerrar = false;
+
 const DEFAULT_URL = '/private/' + usuario + '/' + presentacion;
 const TIEMPO_PETICIONES = 150;
 
@@ -171,26 +173,41 @@ function notas(nota) {
             minutos = '0' + minutos;
         }
         var horaPag = "<em style='font-size: 12px;'>[" + date.getHours() + ":"
-            + minutos + " - P." + PAGE_TO_VIEW + "]</em><br>";
+            + minutos + ` - <a class="pagina" onclick="cambiapagina(${PAGE_TO_VIEW})">P.${PAGE_TO_VIEW}</a>]</em><br>`;
         li.innerHTML = horaPag + nota;
         listaNotas.appendChild(li);
     }
 }
 
-function notafija(nota) {
+function notafija(nota, pagina, id) {
 
     if (nota.length > 0) {
         var li = document.createElement("li");
-        var hoy = "<em style='font-size: 12px;'>[hoy] </em> ";
-        li.innerHTML = hoy + nota;
+        li.id = id;
+        var hoy = `<em style='font-size: 12px;'>[hoy]
+        [<a class="pagina" onclick="cambiapagina(${pagina})">P.${pagina}</a>]</em> `;
+        var elimina = `  <a class="elimina" onclick="eliminaNotaFija('${id}')">X</a>`;
+        li.innerHTML = hoy + nota + elimina;
         notasFijas.appendChild(li);
     }
 
 }
 
+function eliminaNotaFija (idNota){
+    console.log(idNota);
+    var nota = document.getElementById(idNota);
+    document.getElementById("notasFijas").removeChild(nota);
+    var usuarioWeb = usuario;
+    var mensaje = {
+        sesion: sesion,
+        usuario: usuarioWeb,
+        eliminar: idNota
+    }
+    socket.emit("virtualPresentations", mensaje);
+}
+
 function eliminarNotas() {
     listaNotas.innerHTML = "";
-    //numero = 0;
 }
 
 //Comunicación socket
@@ -216,6 +233,7 @@ socket.on(sesion, function (msg) {
             }
             switch (msg.mensaje) {
                 case "OK":
+                    cerrar = true;
                     divpdf.style.display = "block"; // block: mostrar
                     divqr.style.display = "none"; //none: ocultar;
                     header[0].style.display = "none";
@@ -273,6 +291,7 @@ socket.on(sesion, function (msg) {
                     eliminarNotas();
                     break;
                 case "FIN":
+                    cerrar = false;
                     setTimeout(() => {
                         var url = location.href;
                         window.location.replace(url);
@@ -284,8 +303,8 @@ socket.on(sesion, function (msg) {
             }
             peticAnterior = peticNueva;
         } else if (msg.nota && diferencia >= TIEMPO_PETICIONES) {
-            if (msg.fijar) { //TODO revisar nombres
-                notafija(msg.nota); //------------------------------------------------------------------
+            if (msg.fijar) {
+                notafija(msg.nota, msg.pagina, msg.id);
             } else {
                 notas(msg.nota);
             }
@@ -309,13 +328,15 @@ function enviar(texto) {
 }
 
 //pregunta si desea salir
-/*window.addEventListener("beforeunload", function (e) {
+window.addEventListener("beforeunload", function (e) {
+    if (cerrar) {
     var confirmationMessage = "\o/";
     e.returnValue = confirmationMessage;     // Gecko, Trident, Chrome 34+
     return confirmationMessage;              // Gecko, WebKit, Chrome <34
-});*/
+    }
+});
 
-//al cerrar/recargar la página
+//al cerrar/recargar la página //TODO: Revisar salir de exposición
 window.onunload = function () {
     enviar("salir");
 }
