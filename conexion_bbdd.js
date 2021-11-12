@@ -1,14 +1,19 @@
 const mysql = require('mysql');
 /**
  * Estructura de la tabla de usuarios:
- * +------------+---------------+-----------+---------+------------+
- * |  idusuario | nombreusuario | password  | nombre  | apellidos  |
- * +------------+---------------+-----------+---------+------------+
+ * +------------+---------------+-----------+---------+------------+-------+
+ * |  idusuario | nombreusuario | password  | nombre  | apellidos  | token |
+ * +------------+---------------+-----------+---------+------------+-------+
  * 
  * Estructura tabla presentaciones:
  * +----------------+--------------+----------+----------------+
  * | idpresentacion | presentacion | paginas  | nombreusuario  |
  * +----------------+--------------+----------+----------------+
+ * 
+ * Estructura de la tabla sesiones:
+ * +----------+--------+--------------+---------+
+ * | idsesion | sesion | presentacion | usuario |
+ * +----------+--------+--------------+---------+
  */
 // Conexión a la base de datos
 //parámetros de la conexión
@@ -229,7 +234,6 @@ function eliminaPresentacion(presentacion, usuario) {
             if (err) {
                 reject(err);
             } else {
-                //resolve('OK');
                 if (result.affectedRows == 1 && result.insertId != 0){ 
                     resolve('Creada');
                 } else if (result.affectedRows == 1 && result.insertId == 0) {

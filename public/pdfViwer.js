@@ -15,7 +15,7 @@
 "use strict";
 
 /** Variables */
-var socket = io({path:'/virtualpresentation/socket.io'});
+var socket = io({ path: '/virtualpresentation/socket.io' });
 //Variables pdf y html
 var header = document.getElementsByTagName("header");
 var container = document.getElementById("div_container");
@@ -34,7 +34,6 @@ var cerrar = false;
 const DEFAULT_URL = '/private/' + usuario + '/' + presentacion;
 const TIEMPO_PETICIONES = 150;
 
-//console.log("Conectado LEERPDF.JS; Sesion: " + sesion + '\r\n' + DEFAULT_URL);
 divpdf.style.display = "none"; //oculto
 divqr.style.display = "block"; //visible
 
@@ -43,16 +42,13 @@ if (!pdfjsLib.getDocument || !pdfjsViewer.PDFPageView) {
     alert("Please build the pdfjs-dist library using\n  `gulp dist-install`");
 }
 
-// The workerSrc property shall be specified.
-//
+// Se especificará la propiedad workerSrc.
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-reader/build/pdf.worker.js";
 
-// Some PDFs need external cmaps.
-//
+// Algunos PDFs necesitan cmaps externos.
 var CMAP_URL = "/pdf-reader/cmaps/";
 var CMAP_PACKED = true;
 
-//var DEFAULT_URL = "../private/admin/example.pdf";
 var PAGE_TO_VIEW = 1;
 const SCALE_INIT = 0.9;
 var SCALE = SCALE_INIT;
@@ -60,7 +56,7 @@ var pdfDoc;
 
 var eventBus = new pdfjsViewer.EventBus();
 
-// Loading document.
+// Carga del documento
 var loadingTask = pdfjsLib.getDocument({
     url: DEFAULT_URL,
     cMapUrl: CMAP_URL,
@@ -80,20 +76,20 @@ function render() {
     var posicion = getScroll();
     loadingTask.promise.then(function (pdfDocument) {
         container.innerHTML = '';
-        // Document loaded, retrieving the page.
+        // Documento cargado, obtener la página
         return pdfDocument.getPage(PAGE_TO_VIEW).then(function (pdfPage) {
-            // Creating the page view with default parameters.
+            // Creando la vista de página con parámetros predeterminados.
             var pdfPageView = new pdfjsViewer.PDFPageView({
                 container: container,
                 id: PAGE_TO_VIEW,
                 scale: SCALE,
                 defaultViewport: pdfPage.getViewport({ scale: SCALE }),
                 eventBus: eventBus,
-                // We can enable text/annotations layers, if needed
+                // Capas de texto y anotaciones
                 textLayerFactory: new pdfjsViewer.DefaultTextLayerFactory(),
                 annotationLayerFactory: new pdfjsViewer.DefaultAnnotationLayerFactory(),
             });
-            // Associates the actual page with the view, and drawing it
+            // Asociar la página a la vista y mostrarla
             pdfPageView.setPdfPage(pdfPage);
             pdfPageView.draw();
             window.scrollTo(posicion);
@@ -124,7 +120,7 @@ function getScroll() {
     return { top: top, left: left };
 }
 
-/** Funcionamiento socket */
+/** Funcionamiento socket **/
 /**
  * Cambia de página comprobando que la nueva está en los límites del documento
  * @param {number} pagina número de página a la que acceder
@@ -132,14 +128,12 @@ function getScroll() {
 function cambiapagina(pagina) {
     if (pdfDoc == null || pagina > pdfDoc.numPages || pagina < 1) {
         enviar("Error: Página inválida!");
-        //return;
     } else {
         PAGE_TO_VIEW = pagina;
         enviar("Página:" + PAGE_TO_VIEW);
         render();
     }
 }
-
 
 var mostrar = true;
 /**
@@ -172,8 +166,11 @@ function notas(nota) {
         if (minutos < 10) {
             minutos = '0' + minutos;
         }
+        var id = 'temp_' + date.getSeconds() + '_' + date.getMilliseconds();
+        li.id = id;
+        var elimina = `<a class="elimina" onclick="eliminaNotaTemporal('${id}')">   X</a>`;
         var horaPag = "<em style='font-size: 12px;'>[" + date.getHours() + ":"
-            + minutos + ` - <a class="pagina" onclick="cambiapagina(${PAGE_TO_VIEW})">P.${PAGE_TO_VIEW}</a>]</em><br>`;
+            + minutos + ` - <a class="pagina" onclick="cambiapagina(${PAGE_TO_VIEW})">P.${PAGE_TO_VIEW}</a>]</em>${elimina}<br>`;
         li.innerHTML = horaPag + nota;
         listaNotas.appendChild(li);
     }
@@ -184,26 +181,31 @@ function notafija(nota, pagina, id) {
     if (nota.length > 0) {
         var li = document.createElement("li");
         li.id = id;
+        var elimina = `<a class="elimina" onclick="eliminaNotaFija('${id}')">   X</a>`;
         var hoy = `<em style='font-size: 12px;'>[hoy]
-        [<a class="pagina" onclick="cambiapagina(${pagina})">P.${pagina}</a>]</em> `;
-        var elimina = `  <a class="elimina" onclick="eliminaNotaFija('${id}')">X</a>`;
-        li.innerHTML = hoy + nota + elimina;
+        [<a class="pagina" onclick="cambiapagina(${pagina})">P.${pagina}</a>]</em>${elimina}<br>`;
+        li.innerHTML = hoy + nota;
         notasFijas.appendChild(li);
     }
-
 }
 
-function eliminaNotaFija (idNota){
-    console.log(idNota);
+function eliminaNotaFija(idNota) {
     var nota = document.getElementById(idNota);
-    document.getElementById("notasFijas").removeChild(nota);
-    var usuarioWeb = usuario;
-    var mensaje = {
-        sesion: sesion,
-        usuario: usuarioWeb,
-        eliminar: idNota
+    if (nota) {
+        document.getElementById("notasFijas").removeChild(nota);
+        var usuarioWeb = usuario;
+        var mensaje = {
+            sesion: sesion,
+            usuario: usuarioWeb,
+            eliminar: idNota
+        }
+        socket.emit("virtualPresentations", mensaje);
     }
-    socket.emit("virtualPresentations", mensaje);
+}
+
+function eliminaNotaTemporal(idNota) {
+    var nota = document.getElementById(idNota);
+    if (nota) document.getElementById("listaNotas").removeChild(nota);
 }
 
 function eliminarNotas() {
@@ -212,23 +214,18 @@ function eliminarNotas() {
 
 //Comunicación socket
 var peticAnterior = 0;
-//socket.on('virtualPresentations', function (msg) {
 socket.on(sesion, function (msg) {
     var peticNueva = Date.now();
     var user = msg.usuario;
     var sessionApp = msg.sesion;
-    //var usuarioNota = usuario + "-nota";
     var diferencia = peticNueva - peticAnterior; //Para comprobar que no se realizan varias peticiones seguidas
-    //console.log('(' + peticNueva + ', ' + diferencia + ')socket id :' + socket.id + ', sesion: ' + sessionApp
-    //    + ' mensaje: ' + Object.values(msg) + ' usuario recibido:' + user);//muestra el id del socket
     if (sessionApp == sesion) {
         if (user == usuario && diferencia >= TIEMPO_PETICIONES && msg.mensaje) {
-            var pagina = 0;
+            var pagina = 1;
             //Página específica
             if (msg.mensaje.startsWith("pnum")) {
                 pagina = msg.mensaje.split("-")[1];
                 var p = parseInt(pagina, 10); //entero decimal
-                //console.log("Pagina recibida: " + p);
                 return cambiapagina(p);
             }
             switch (msg.mensaje) {
@@ -330,13 +327,13 @@ function enviar(texto) {
 //pregunta si desea salir
 window.addEventListener("beforeunload", function (e) {
     if (cerrar) {
-    var confirmationMessage = "\o/";
-    e.returnValue = confirmationMessage;     // Gecko, Trident, Chrome 34+
-    return confirmationMessage;              // Gecko, WebKit, Chrome <34
+        var confirmationMessage = "\o/";
+        e.returnValue = confirmationMessage;     // Gecko, Trident, Chrome 34+
+        return confirmationMessage;              // Gecko, WebKit, Chrome <34
     }
 });
 
-//al cerrar/recargar la página //TODO: Revisar salir de exposición
+//al cerrar/recargar la página
 window.onunload = function () {
     enviar("salir");
 }

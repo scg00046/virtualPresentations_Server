@@ -26,19 +26,19 @@
     },
     {
       "name": "Sesiones",
-      "description": "Crear y eliminar sesiones"
+      "description": "Listado, crear y eliminar sesiones"
     },
     {
       "name": "Portal",
       "description": "Portal de presentación",
       "externalDocs": {
         "description": "Enlace de ejemplo",
-        "url": "http://localhost:8080/virtualpresentation/user/session"
+        "url": "https://localhost:8080/virtualpresentation/user/sesion"
       }
     }
   ],
   "schemes": [
-    "http"
+    "https"
   ],
   "paths": {
     "/usuario": {
@@ -216,8 +216,7 @@
           "204": {
             "description": "No hay presentaciones para el usuario",
             "schema": {
-              "type": "array",
-              "items": {}
+              "type": "string"
             }
           },
           "401": {
@@ -335,7 +334,7 @@
         }
       }
     },
-    "/session/{usuario}": {
+    "/sesion/{usuario}": {
       "get": {
         "tags": [
           "Sesiones"
@@ -364,15 +363,14 @@
             "schema": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/Sesion"
+                "$ref": "#/definitions/Sesiones"
               }
             }
           },
           "204": {
             "description": "No hay sesiones para el usuario",
             "schema": {
-              "type": "array",
-              "items": {}
+              "type": "string"
             }
           },
           "401": {
@@ -458,7 +456,7 @@
           },
           {
             "in": "header",
-            "name": "session",
+            "name": "sesion",
             "description": "Nombre de la sesión a eliminar",
             "required": true,
             "type": "string"
@@ -562,24 +560,47 @@
     "Presentacion": {
       "type": "object",
       "properties": {
-        "id": {
+        "idpresentacion": {
           "type": "integer"
         },
-        "nombrepresentacion": {
+        "presentacion": {
           "type": "string"
         },
-        "numpags": {
+        "paginas": {
           "type": "integer"
+        },
+        "usuario": {
+          "type": "string"
         }
       }
     },
     "Sesion": {
       "type": "object",
       "properties": {
-        "session": {
+        "sesion": {
           "type": "string"
         },
-        "presentation": {
+        "presentacion": {
+          "type": "string"
+        }
+      }
+    },
+    "Sesiones": {
+      "type": "object",
+      "properties": {
+        "idsesion": {
+          "type": "integer"
+        },
+        "sesion": {
+          "type": "string"
+        },
+        "presentacion": {
+          "type": "string"
+        },
+        "paginas": {
+          "type": "integer"
+        },
+        "usuario": {
           "type": "string"
         }
       }

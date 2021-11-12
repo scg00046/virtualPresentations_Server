@@ -13,13 +13,14 @@ const fs = require('fs');
 const pdfData = require('pdf-page-counter'); //Obtener datos de la presentación
 const pdfjsdist = require('pdfjs-dist'); //Lector pdf, utilizado en la vista
 const qrcode = require('qrcode');
-const http = require('http').createServer(app); //npm i http
-const io = require('socket.io')(http, { path: '/virtualpresentation/socket.io' }); //npm i socket.io
+const https = require('https'); //npm i http
+const io = require('socket.io'); //npm i socket.io
 const random = require('randomstring');
 const swaggerUi = require('swagger-ui-express');
 
 const mysql = require('./conexion_bbdd'); //Conexión a la base de datos
 const midd = require('./middleware');
+const certs = path.join(__dirname, 'certs', 'vPresentation');
 
 //REST
 const puerto = 8080;
@@ -34,7 +35,7 @@ const urlLogin = rutadef + '/usuario';
 const urlUsuario = rutadef + '/:usuario';
 /** Crear y borrar (delete) sesión
  * /virtualpresentation/session/:usuario */
-const urlcreaSesion = rutadef + '/session/:usuario';
+const urlcreaSesion = rutadef + '/sesion/:usuario';
 /** Mostrar qr  
  * /virtualpresentation/:usuario/:nombresesion */
 const urlpresentacion = urlUsuario + '/:nombresesion';
@@ -47,24 +48,20 @@ app.set('case sensitive routing', true); //URL sensibles a mayusculas
 app.set('view engine', 'ejs'); //Motor de vistas
 
 //Cabeceras y métodos
-app.use(function (req, res, next) { //TODO: revisar cabeceras
-	//res.header("Access-Control-Allow-Origin", "*");
-	//res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Language, Version");
+app.use(function (req, res, next) {
 	var methods = 'GET,POST,PUT,DELETE'
 	res.header('Access-Control-Allow-Methods', methods);
 	(methods.split(',').find(m => m == req.method)) ? next() : res.sendStatus(405);
 });
 
 //Desarrollo
-const morgan = require('morgan');
-app.use(morgan('dev'));
+// const morgan = require('morgan');
+// app.use(morgan('dev'));
 
 //Obtener los recursos necesarios para la página web
-//app.use('/public/css', express.static(__dirname + '/css'));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/private', express.static(path.join(__dirname, 'private')));
 app.use('/pdf-reader', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist')));
-//app.use('/public/img', express.static(__dirname + '/img'));
 
 //Documentación de la API
 const swaggerDocument = require('./public/swagger.json');
@@ -95,7 +92,7 @@ const qrOp = {
 app.put(urlLogin, function (request, response) {
 	var usuario = request.body;
 
-	if (usuario) {
+	if (usuario.nombreusuario && usuario.password && usuario.nombre) {
 		mysql.buscausuario(usuario.nombreusuario).then((usuario) => {
 			response.status(409).send("El usuario ya existe");
 		}).catch((error) => {
@@ -165,14 +162,11 @@ app.get(urlLogin, midd.authorization, function (request, response) {
 	desde la aplicación */
 app.get(urlUsuario, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
-	// var hora = new Date().getHours() + ':' + new Date().getMinutes();
-	// console.log(hora + " Petición de presentaciones: " + usuario);
 	if (usuario == request.usuario) {
 		mysql.buscaPresentaciones(request.usuario).then((listaPresentaciones) => {
 			response.status(200).send(listaPresentaciones);
 		}).catch((error) => {
 			if (error == 'Lista vacía') {
-				//response.status(204).send("No hay presentaciones para el usuario");
 				response.status(204).send([]);
 			} else {
 				response.status(500).send(error);
@@ -182,13 +176,14 @@ app.get(urlUsuario, midd.authorization, function (request, response) {
 		response.status(403).send('Parámetros incorrectos o incompletos');
 	}
 });
+
 /* Subida de presentación al servidor */
 app.put(urlUsuario, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
-	var presentacion = request.files.presentacion;
+	var presentacion = request.files?.presentacion;
 
 	if (usuario == request.usuario && presentacion) {
-		if (!request.files || Object.keys(request.files).length === 0) {
+		if (!request.files || Object.keys(request.files).length === 0 || presentacion.mimetype != 'application/pdf') {
 			return response.status(400).send('No se ha subido ningún archivo');
 		} else {
 			//Comprobación de usuario
@@ -200,39 +195,31 @@ app.put(urlUsuario, midd.authorization, function (request, response) {
 
 					//Comprobación directorio del usuario
 					fs.mkdir(directorioUsuario, (e) => {
-						/*console.log('directorio: ',e);
-						if (e.code == "EEXIST") {
-							return;
-						} else if (e) {
+						/*if (e) {
 							return console.log('Error: ' + e.code);
-						}
-						console.log('Directorio creado');*/
+						}*/
 					});
 					//Añadir presentación al directorio y a la base de datos
 					presentacion.mv(directorioPresentacion, function (err) {
 						if (err) {
-							console.error('Error al guardar la presentación: ' + err.code);
+							// console.error('Error al guardar la presentación: ' + err.code);
 							return response.status(500).send(err);
 						} else {
-							console.log('Presentación almacenada');
 							//Obtener el número de páginas y agregarlo a la base de datos
 							pdfData(presentacion).then(function (datos) {
 								var paginas = datos.numpages;
-								console.log('numero de paginas', paginas);
 								mysql.creaPresentacion(presentacion.name, paginas, usuario).then((respuesta) => {
 									if (respuesta == 'OK') {
-										console.log('registro en bbdd');
 										//crear json para notas fijas
 										var notasPresentacion = presentacion.name.split('.pdf')[0] + '.json';
 										var listaNotas = path.join(directorioUsuario, notasPresentacion);
 										fs.writeFile(listaNotas, '[]', function (err) {
 											if (err) return err;
-											console.log('DONE');
 										});
 										response.status(200).send('Presentación almacenada');
 									}
 								}).catch(e => {
-									console.error('Error en el registro en la bbdd: ', e);
+									// console.error('Error en el registro en la bbdd: ', e);
 									//Elimina el fichero si no se ha podido registrar
 									fs.unlink(directorioPresentacion, (err) => {
 										if (err) console.error('Error al Eliminar fichero: ' + err);
@@ -294,14 +281,11 @@ app.delete(urlUsuario, midd.authorization, function (request, response) {
 	Devuelve las sesiones creadas por el usuario */
 app.get(urlcreaSesion, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
-	// var hora = new Date().getHours() + ':' + new Date().getMinutes();
-	// console.log(hora + " Petición de presentaciones: " + usuario);
 	if (usuario == request.usuario) {
 		mysql.buscaSesiones(request.usuario).then((listaSesiones) => {
 			response.status(200).send(listaSesiones);
 		}).catch((error) => {
 			if (error == 'Lista vacía') {
-				//response.status(204).send("No hay presentaciones para el usuario");
 				response.status(204).send([]);
 			} else {
 				response.status(500).send(error);
@@ -317,8 +301,8 @@ Atributos necesarios: nombresesion; presentacion;
 */
 app.post(urlcreaSesion, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario; //de la propia url
-	var sesion_req = request.body.session;
-	var presentacion = request.body.presentation;
+	var sesion_req = request.body.sesion;
+	var presentacion = request.body.presentacion;
 
 	if (usuario == request.usuario && sesion_req && presentacion) {
 		mysql.registraSesion(sesion_req, presentacion, usuario).then(s => {
@@ -334,7 +318,7 @@ app.post(urlcreaSesion, midd.authorization, function (request, response) {
 //Finaliza la sesión
 app.delete(urlcreaSesion, midd.authorization, function (request, response) {
 	var usuario = request.params.usuario;
-	var sesion = request.headers.session;
+	var sesion = request.headers.sesion;
 
 	if (usuario == request.usuario && sesion) {
 
@@ -382,22 +366,25 @@ app.all('*', function (request, response) {
 	response.status(404).send(`No se ha encontrado el recurso: http://${request.headers.host}${request.url}`);
 });
 
-http.listen(puerto, () => {
+const httpsServer = https.createServer({
+	key: fs.readFileSync(certs + '.key'),
+	cert: fs.readFileSync(certs + '.crt')
+}, app);
+httpsServer.listen(puerto, () => {
 	console.log(`Servidor Presentación virtual:
-http://localhost:${puerto}/virtualpresentation`)
+https://localhost:${puerto}/virtualpresentation`)
 });
 
+/* WEBSOCKET */
+const ioServer = io(httpsServer, { path: '/virtualpresentation/socket.io' });
 // Conexión de clientes socket
-io.on('connection', (socket) => {
-	//console.log('Room socket: ' + nombresesion + '; Usuario conectado, id:', socket.id);
-	console.log('Usuario conectado: ' + socket.id);
-	//io.emit('Hi!');
+ioServer.on('connection', (socket) => {
+	// console.log('Usuario conectado: ', socket.id);
 	//Recepción de mensajes
 	socket.on('virtualPresentations', (msg) => {
 		var nombresesion = msg.sesion;
 		var s = msg.sesion.split('_')[0]; //Sesión sin el código
-		console.log('Mensaje (' + nombresesion + '): ' + Object.values(msg)/*msg*/);
-		//io.to(msg.usuario).emit('cambia pagina',msg);
+		// console.log('Mensaje (' + nombresesion + '): ',msg);
 		if (msg.eliminar) {
 			mysql.buscaSesionUsuario(msg.usuario, s).then(sesion => {
 				var notasPresentacion = sesion.presentacion.split('.pdf')[0] + '.json';
@@ -409,8 +396,6 @@ io.on('connection', (socket) => {
 			}).catch(e => { console.error(e) });
 		} else {
 			if (msg.fijar) {
-				console.log('nota a fijar');
-				//var usuario = msg.usuario.split('-')[0]; //usuario sin '-nota'
 				mysql.buscaSesionUsuario(msg.usuario, s).then(sesion => {
 					var notasPresentacion = sesion.presentacion.split('.pdf')[0] + '.json';
 					var rutaNotas = path.join(__dirname, 'private', sesion.usuario, notasPresentacion);
@@ -423,17 +408,16 @@ io.on('connection', (socket) => {
 					}
 					listaNotas.push(nota);
 					fs.writeFileSync(rutaNotas, JSON.stringify(listaNotas, null, 1));
-					io.emit(nombresesion, Object.assign(msg, nota));
+					ioServer.emit(nombresesion, Object.assign(msg, nota));
 				}).catch(e => { console.error(e) });
 			} else {
-				io.emit(nombresesion, msg);
+				ioServer.emit(nombresesion, msg);
 			}
 		}
 	});
 	//Desconexión de usuario
 	socket.on('disconnect', () => {
 		console.log('Usuario desconectado, id:', socket.id);
-		//io.emit('virtualPresentations', "desconectado");
 	});
 });
 

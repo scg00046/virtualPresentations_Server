@@ -51,20 +51,22 @@
         <div id="div_pdfviwer" style="display: none;">
             <!-- DIV lista de notas -->
             <div id="div_sidebar" class="sidebar" style="margin-left: 0px;">
-                <div id="nota_top" style="float: inline-start; max-width: 95%;">
+                <div id="nota_top">
                     <ul id="listaNotas"></ul>
+                    <br><br>
                 </div>
-                <div id="notas_button" style="float: inline-end; max-width: 95%;">
+                <div class="notas_separador"></div>
+                <div id="notas_button">
                     <ul id="notasFijas">
                         <% for (var i = 0; i < listaNotas.length; i++) { %>
                         <li id=<%=listaNotas[i].id%>><em style='font-size: 12px;'>[<%=listaNotas[i].fecha%>]
-                            [<a class="pagina" onclick="cambiapagina(<%=listaNotas[i].pagina%>)">P.<%=listaNotas[i].pagina%></a>]
-                        </em>
+                            [<a class="pagina" onclick=<%="cambiapagina("+listaNotas[i].pagina+")"%>>P.<%=listaNotas[i].pagina%></a>]</em> <a class="elimina" onclick=<%=`eliminaNotaFija('${listaNotas[i].id}')`%>>   X</a>
+                        <br>
                             <%-listaNotas[i].nota%>
-                            <a class="elimina" onclick="eliminaNotaFija(<%=`'${listaNotas[i].id}'`%>)">X</a>
                         </li>
                         <% } %>
                     </ul>
+                    <br><br><br>
                 </div>
             </div>
             <!-- Contenedor del documento -->

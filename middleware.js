@@ -37,7 +37,6 @@ function authorization(request, response, next) {
             return response.status(401).send('Token inválido');
         }
     }
-
 }
 
 function generateToken(user) {
